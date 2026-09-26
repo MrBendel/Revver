@@ -61,7 +61,7 @@ android {
     }
 }
 
-// Automatically sync latest web application assets into Android assets
+// Sync web application assets into Android assets
 tasks.register('syncWebAssets', Copy) {
     from("${rootDir}/..") {
         include 'index.html', 'style.css', 'app.js', 'audio_engine.js', 'drivetrain.js', 'engine_sim_processor.js', 'sensors.js', 'sounds/**'
@@ -69,8 +69,10 @@ tasks.register('syncWebAssets', Copy) {
     into("${projectDir}/src/main/assets")
 }
 
-tasks.matching { it.name.startsWith("preBuild") || it.name.startsWith("generate") }.configureEach {
-    dependsOn syncWebAssets
+project.afterEvaluate {
+    tasks.named('preBuild').configure {
+        dependsOn tasks.named('syncWebAssets')
+    }
 }
 
 dependencies {

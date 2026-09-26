@@ -25,9 +25,12 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools'
+          log-accepted-android-sdk-licenses: false
 
-      - name: Setup Gradle
+      - name: Setup Gradle 8.5
         uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.5'
 
       - name: Sync Web Application Assets
         run: |
@@ -35,13 +38,19 @@ jobs:
           cp index.html style.css app.js audio_engine.js drivetrain.js engine_sim_processor.js sensors.js android/app/src/main/assets/
           cp -r sounds android/app/src/main/assets/
 
-      - name: Build Debug APK
+      - name: Build Debug APK & Release Bundle
         run: |
           cd android
-          gradle assembleDebug
+          gradle assembleDebug bundleRelease
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: revver-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload Unsigned Release Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: revver-release-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
