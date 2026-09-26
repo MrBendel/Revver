@@ -1,0 +1,1926 @@
+/* ==========================================================================
+   REVVER — STUTTGART 911 HERITAGE COCKPIT & VIRTUAL POWERTRAIN
+   Classic 90s (964/993) to Modern (991/992) Automotive Design System
+   ========================================================================== */
+
+:root {
+  /* Porsche Heritage Color Palette */
+  --porsche-red: #d5001c;        /* Guards Red / Indischrot */
+  --porsche-red-dark: #980014;
+  --porsche-red-glow: rgba(213, 0, 28, 0.45);
+  --porsche-yellow: #f2a900;     /* Speed Yellow / Speedgelb */
+  --porsche-yellow-glow: rgba(242, 169, 0, 0.4);
+  --porsche-gold: #c4a159;       /* Stuttgart Crest Gold */
+  --vdo-ivory: #f5f2ea;          /* VDO Instrument Ivory / Pale Cream */
+  --vdo-amber: #ff9a00;          /* Classic Backlit LCD Matrix Amber */
+  --vdo-amber-glow: rgba(255, 154, 0, 0.35);
+
+  /* Cockpit Surfaces & Materials */
+  --cockpit-bg: #090a0d;         /* Deep Charcoal / German Black */
+  --panel-bg: #13151b;          /* German Leather / Slate */
+  --card-bg: #181b22;           /* Satin Slate Console */
+  --card-inner: #101217;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-gold: rgba(196, 161, 89, 0.35);
+  --border-metallic: rgba(200, 205, 215, 0.25);
+
+  /* Machined Aluminum Bezels */
+  --bezel-aluminum: linear-gradient(135deg, #f2f4f8 0%, #a2a8b5 45%, #5a606d 55%, #c8ced8 100%);
+  --bezel-dark: linear-gradient(180deg, #222630 0%, #0d0f14 100%);
+  --bezel-gold: linear-gradient(135deg, #f7d88b 0%, #c4a159 50%, #7d5f22 100%);
+
+  /* Typography */
+  --font-display: 'Rajdhani', -apple-system, sans-serif;
+  --font-condensed: 'Barlow Condensed', sans-serif;
+  --font-serif: 'Cinzel', Georgia, serif;
+  --font-sans: 'Inter', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-lcd: 'Share Tech Mono', monospace;
+
+  /* Geometry */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-binnacle: 0 16px 40px rgba(0, 0, 0, 0.85);
+  --shadow-bezel: inset 0 2px 4px rgba(255, 255, 255, 0.25), 0 8px 24px rgba(0, 0, 0, 0.7);
+  --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background-color: var(--cockpit-bg);
+  /* Perforated German Leather Texture */
+  background-image:
+    radial-gradient(circle at 50% 25%, rgba(213, 0, 28, 0.03) 0%, transparent 60%),
+    radial-gradient(circle at 85% 75%, rgba(196, 161, 89, 0.02) 0%, transparent 50%),
+    radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 9px 9px;
+  color: var(--vdo-ivory);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+  user-select: none;
+}
+
+/* ==========================================================================
+   APP SHELL LAYOUT
+   ========================================================================== */
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-width: 1740px;
+  margin: 0 auto;
+  padding: 0.65rem 1.25rem;
+}
+
+/* ==========================================================================
+   HEADER: LE MANS LEFT-HAND IGNITION & STUTTGART BRANDING
+   ========================================================================== */
+
+.porsche-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 1.35rem;
+  background: linear-gradient(180deg, #161820 0%, #101217 100%);
+  border: 1px solid var(--border-subtle);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md);
+  margin-bottom: 0.75rem;
+  box-shadow: var(--shadow-card);
+  position: relative;
+}
+
+/* Porsche Le Mans Tradition: Left-hand Key Ignition */
+.header-ignition-slot {
+  display: flex;
+  align-items: center;
+}
+
+.porsche-key-switch {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  background: linear-gradient(135deg, #1c202a 0%, #0d0e12 100%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 1.1rem 0.45rem 0.65rem;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.porsche-key-switch:hover {
+  border-color: var(--porsche-red);
+  box-shadow: 0 0 16px var(--porsche-red-glow);
+}
+
+.porsche-key-switch:active,
+.porsche-key-switch.active {
+  background: linear-gradient(135deg, #241416 0%, #130a0b 100%);
+  border-color: var(--porsche-red);
+}
+
+.key-escutcheon {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--bezel-aluminum);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.4), 0 3px 8px rgba(0, 0, 0, 0.6);
+  position: relative;
+  transition: transform 0.3s ease;
+}
+
+.porsche-key-switch.active .key-escutcheon {
+  transform: rotate(45deg);
+}
+
+.key-slot-slit {
+  width: 20px;
+  height: 5px;
+  background: #0d0f14;
+  border-radius: 2px;
+  box-shadow: inset 0 1px 3px #000;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.porsche-key-switch.active .key-slot-slit {
+  background: var(--porsche-red);
+  box-shadow: 0 0 8px var(--porsche-red);
+}
+
+.ignition-label-box {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.key-subtext {
+  font-family: var(--font-condensed);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--porsche-gold);
+}
+
+.ignition-main-text {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #ffffff;
+}
+
+.porsche-key-switch.active .ignition-main-text {
+  color: var(--porsche-red);
+}
+
+/* Center Crest & Brand */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.brand-crest {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 2px 8px rgba(196, 161, 89, 0.35));
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.logo-name {
+  font-family: var(--font-condensed);
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: #ffffff;
+  line-height: 1.1;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+}
+
+.logo-badge {
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  color: var(--porsche-gold);
+}
+
+/* Header Status Pills */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+}
+
+.header-status {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.75rem;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: #9aa2b1;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #444b58;
+}
+
+.status-dot.active {
+  background: #00e676;
+  box-shadow: 0 0 8px #00e676;
+}
+
+.status-dot.warning {
+  background: var(--porsche-yellow);
+  box-shadow: 0 0 8px var(--porsche-yellow);
+}
+
+/* PCM Display Button */
+.porsche-pcm-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, #222631 0%, #12141a 100%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-sm);
+  color: #ffffff;
+  font-family: var(--font-condensed);
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.porsche-pcm-btn:hover {
+  background: linear-gradient(135deg, #2a3040 0%, #181c24 100%);
+  border-color: var(--porsche-gold);
+  color: var(--porsche-gold);
+}
+
+/* ==========================================================================
+   MAIN 3-COLUMN WORKSPACE
+   ========================================================================== */
+
+.main-layout {
+  display: grid;
+  grid-template-columns: 310px 1fr 310px;
+  gap: 1.15rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.sidebar-panel,
+.control-panel {
+  background: linear-gradient(180deg, #14161d 0%, #0e1014 100%);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  box-shadow: var(--shadow-card);
+}
+
+.sidebar-panel::-webkit-scrollbar,
+.control-panel::-webkit-scrollbar {
+  width: 5px;
+}
+.sidebar-panel::-webkit-scrollbar-thumb,
+.control-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+
+.panel-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-condensed);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--porsche-gold);
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid rgba(196, 161, 89, 0.2);
+}
+
+.panel-section-title .badge {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: #8c93a4;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+}
+
+/* ==========================================================================
+   LEFT SIDEBAR: ENGINE ROSTER, GEARBOX & DRIVE MODES
+   ========================================================================== */
+
+.engine-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.engine-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.85rem;
+  background: rgba(24, 27, 35, 0.6);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.engine-card:hover {
+  background: rgba(35, 40, 52, 0.75);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.engine-card.active {
+  background: linear-gradient(90deg, rgba(213, 0, 28, 0.15) 0%, rgba(20, 23, 30, 0.8) 100%);
+  border-color: rgba(213, 0, 28, 0.45);
+  border-left: 3px solid var(--porsche-red);
+}
+
+.engine-card-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.engine-card-name {
+  font-family: var(--font-condensed);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+}
+
+.engine-card-spec {
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  color: #838a9a;
+  margin-top: 0.15rem;
+}
+
+.engine-card.active .engine-card-spec {
+  color: #bcc3d4;
+}
+
+.engine-card-tag {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 0.2rem 0.45rem;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  color: var(--porsche-gold);
+}
+
+/* Transmission Selector Buttons */
+.gearbox-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.gearbox-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0.55rem 0.85rem;
+  background: #171922;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  text-align: left;
+}
+
+.gearbox-btn:hover {
+  background: #202430;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.gearbox-btn.active {
+  background: linear-gradient(135deg, #242937 0%, #151821 100%);
+  border-color: var(--porsche-gold);
+  box-shadow: inset 0 0 12px rgba(196, 161, 89, 0.15);
+}
+
+.gb-name {
+  font-family: var(--font-condensed);
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+}
+
+.gb-desc {
+  font-family: var(--font-sans);
+  font-size: 0.66rem;
+  color: #7b8394;
+  margin-top: 0.1rem;
+}
+
+.gearbox-btn.active .gb-name {
+  color: var(--porsche-gold);
+}
+
+/* Drive Mode Buttons */
+.drive-mode-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.drive-mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0.55rem 0.85rem;
+  background: #171922;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  text-align: left;
+}
+
+.drive-mode-btn:hover {
+  background: #202430;
+}
+
+.drive-mode-btn.active {
+  border-color: var(--porsche-red);
+  background: linear-gradient(90deg, rgba(213, 0, 28, 0.15) 0%, rgba(23, 25, 34, 1) 100%);
+}
+
+.dm-name {
+  font-family: var(--font-condensed);
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #ffffff;
+}
+
+.dm-desc {
+  font-family: var(--font-sans);
+  font-size: 0.66rem;
+  color: #7b8394;
+  margin-top: 0.1rem;
+}
+
+.drive-mode-btn.active .dm-name {
+  color: var(--porsche-red);
+}
+
+/* Sliders */
+.sound-tuning-box {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.tuning-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.tuning-row label {
+  font-family: var(--font-condensed);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #9aa2b1;
+  display: flex;
+  justify-content: space-between;
+}
+
+.tuning-val {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--porsche-gold);
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 5px;
+  background: #232733;
+  border-radius: 3px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bezel-aluminum);
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
+.custom-wav-box {
+  margin-top: 0.75rem;
+}
+
+.custom-wav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.55rem;
+  background: rgba(196, 161, 89, 0.08);
+  border: 1px dashed rgba(196, 161, 89, 0.35);
+  border-radius: var(--radius-sm);
+  color: var(--porsche-gold);
+  font-family: var(--font-condensed);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.custom-wav-btn:hover {
+  background: rgba(196, 161, 89, 0.18);
+  border-color: var(--porsche-gold);
+}
+
+/* ==========================================================================
+   CENTER COCKPIT: PORSCHE 911 5-POD BINNACLE & SPORT CHRONO
+   ========================================================================== */
+
+.cockpit-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.25rem 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Dashboard Brow Cowl with Sport Chrono Stopwatch & Shift Lights */
+.dashboard-brow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 1040px;
+  margin-bottom: -10px;
+  z-index: 10;
+  position: relative;
+  padding: 0 0.75rem;
+}
+
+.cluster-mode-switch-box {
+  display: flex;
+  align-items: center;
+}
+
+.cluster-mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.85rem;
+  background: rgba(18, 20, 26, 0.85);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  font-family: var(--font-condensed);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #9aa1b2;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(4px);
+}
+
+.cluster-mode-btn:hover {
+  background: rgba(30, 34, 44, 0.95);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.cluster-mode-btn.active {
+  background: rgba(22, 26, 35, 0.95);
+  border-color: var(--porsche-gold);
+  color: var(--porsche-gold);
+  box-shadow: 0 0 12px rgba(196, 161, 89, 0.25);
+}
+
+.cluster-mode-btn .mode-icon {
+  font-size: 0.85rem;
+  color: var(--porsche-gold);
+}
+
+.sport-chrono-housing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.sport-chrono-housing:hover {
+  transform: translateY(-2px);
+}
+
+#chrono-canvas {
+  width: 110px;
+  height: 110px;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.8));
+}
+
+.chrono-tag {
+  font-family: var(--font-condensed);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--porsche-gold);
+  margin-top: -8px;
+  background: rgba(10, 12, 16, 0.9);
+  padding: 0.1rem 0.5rem;
+  border-radius: 3px;
+  border: 1px solid rgba(196, 161, 89, 0.3);
+}
+
+/* Shift Lights Bar */
+.shift-lights-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 1rem;
+  background: rgba(12, 14, 18, 0.85);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  margin-top: 0.4rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.65);
+}
+
+.shift-light {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #181b22;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.06s ease;
+}
+
+.shift-light.green.active {
+  background: #00ff66;
+  box-shadow: 0 0 12px #00ff66, inset 0 0 3px #ffffff;
+}
+
+.shift-light.yellow.active {
+  background: var(--porsche-yellow);
+  box-shadow: 0 0 14px var(--porsche-yellow), inset 0 0 3px #ffffff;
+}
+
+.shift-light.red.active {
+  background: var(--porsche-red);
+  box-shadow: 0 0 16px var(--porsche-red), inset 0 0 3px #ffffff;
+}
+
+.shift-light.blue.active {
+  background: #00d2ff;
+  box-shadow: 0 0 20px #00d2ff, inset 0 0 4px #ffffff;
+  animation: flashPulse 0.1s alternate infinite;
+}
+
+@keyframes flashPulse {
+  0% { opacity: 0.35; }
+  100% { opacity: 1; }
+}
+
+/* The Iconic 5-Pod Porsche 911 Instrument Cluster Container */
+.cluster-gauge-container.porsche-binnacle {
+  position: relative;
+  width: 100%;
+  max-width: 1040px;
+  aspect-ratio: 1040 / 420;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 14px 35px rgba(0, 0, 0, 0.8));
+}
+
+.binnacle-leather-brow {
+  position: absolute;
+  top: 0;
+  left: 2%;
+  right: 2%;
+  height: 22px;
+  border-top: 1px dashed rgba(196, 161, 89, 0.35);
+  border-bottom: 2px solid #08090c;
+  pointer-events: none;
+  z-index: 5;
+  border-radius: 50% 50% 0 0 / 20px 20px 0 0;
+  transition: all 0.3s ease;
+}
+
+.cluster-gauge-container.pure-mode .binnacle-leather-brow {
+  left: 22%;
+  right: 22%;
+  border-radius: 50% 50% 0 0 / 24px 24px 0 0;
+}
+
+#tachometer-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* In-Tachometer Backlit Matrix LCD (Digital Speedometer & Gear) */
+.porsche-lcd-matrix {
+  position: absolute;
+  top: 67%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  z-index: 12;
+  background: rgba(14, 11, 7, 0.88);
+  border: 1px solid rgba(255, 154, 0, 0.35);
+  border-radius: 4px;
+  padding: 0.25rem 0.95rem;
+  box-shadow: inset 0 0 14px rgba(255, 154, 0, 0.2), 0 4px 12px rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+  transition: all 0.25s ease;
+}
+
+.cluster-gauge-container.pure-mode .porsche-lcd-matrix {
+  top: 70%;
+}
+
+.pure-display-hud {
+  min-width: 216px;
+  padding: 0.35rem 1.3rem;
+  background: rgba(9, 8, 6, 0.94);
+  border: 1.5px solid rgba(255, 154, 0, 0.42);
+  border-radius: 6px;
+  box-shadow: inset 0 0 18px rgba(255, 154, 0, 0.22), 0 8px 24px rgba(0, 0, 0, 0.9);
+}
+
+.lcd-matrix-main-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.4rem;
+  width: 100%;
+}
+
+.gear-badge-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.gear-subtext {
+  font-family: var(--font-condensed);
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
+  color: var(--vdo-amber);
+  opacity: 0.8;
+}
+
+.gear-main {
+  font-family: var(--font-display);
+  font-size: 3.2rem;
+  font-weight: 700;
+  line-height: 0.95;
+  color: var(--vdo-amber);
+  text-shadow: 0 0 16px var(--vdo-amber-glow);
+  transition: transform 0.12s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+.gear-mode-tag {
+  font-family: var(--font-condensed);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 0.05rem 0.4rem;
+  background: rgba(255, 154, 0, 0.15);
+  border-radius: 2px;
+  color: var(--vdo-amber);
+}
+
+.speed-readout-giant {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.speed-readout-giant .speed-number {
+  font-family: var(--font-display);
+  font-size: 3.4rem;
+  font-weight: 700;
+  line-height: 0.95;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.35);
+}
+
+.speed-readout-giant .speed-unit-toggle {
+  font-family: var(--font-condensed);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--vdo-amber);
+  cursor: pointer;
+  pointer-events: auto;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 154, 0, 0.25);
+  background: rgba(255, 154, 0, 0.08);
+}
+
+.speed-readout-giant .speed-unit-toggle:hover {
+  background: rgba(255, 154, 0, 0.28);
+}
+
+.lcd-matrix-sub-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 1rem;
+  margin-top: 0.25rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(255, 154, 0, 0.2);
+}
+
+.rpm-digital-readout {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #8c93a4;
+}
+
+.rpm-digital-readout #hud-rpm-val {
+  color: #ffffff;
+}
+
+.rpm-unit {
+  font-size: 0.62rem;
+  color: var(--porsche-gold);
+}
+
+.rpm-unit {
+  font-size: 0.62rem;
+  color: var(--porsche-gold);
+}
+
+/* Sub-indicators */
+.gauge-sub-indicators {
+  position: absolute;
+  bottom: 8%;
+  display: flex;
+  gap: 0.85rem;
+  z-index: 15;
+}
+
+.limiter-badge,
+.shift-cut-badge {
+  font-family: var(--font-condensed);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 0.2rem 0.65rem;
+  border-radius: 3px;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: all 0.1s ease;
+}
+
+.limiter-badge {
+  background: var(--porsche-red);
+  color: #ffffff;
+  box-shadow: 0 0 16px var(--porsche-red-glow);
+}
+
+.shift-cut-badge {
+  background: var(--porsche-yellow);
+  color: #000000;
+  box-shadow: 0 0 16px var(--porsche-yellow-glow);
+}
+
+.limiter-badge.active,
+.shift-cut-badge.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ==========================================================================
+   LIVE TELEMETRY STRIP (PCM STYLE)
+   ========================================================================== */
+
+.live-telemetry-strip {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1rem;
+  width: 100%;
+  max-width: 1040px;
+  margin-top: 0.5rem;
+}
+
+.telemetry-card {
+  background: linear-gradient(180deg, #161820 0%, #101217 100%);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.85rem;
+}
+
+.telemetry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-condensed);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #8c93a4;
+  margin-bottom: 0.4rem;
+}
+
+.telemetry-badge {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--porsche-gold);
+}
+
+#spectrum-canvas {
+  width: 100%;
+  height: 60px;
+  display: block;
+}
+
+/* G-Meter */
+.g-meter-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.g-meter-track {
+  width: 100%;
+  height: 10px;
+  background: #1c202a;
+  border-radius: 5px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.g-meter-center-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.4);
+  transform: translateX(-50%);
+}
+
+.g-meter-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0%;
+  background: var(--porsche-red);
+  transition: width 0.05s ease-out, left 0.05s ease-out;
+}
+
+.g-meter-labels {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: #646c7c;
+}
+
+/* Throttle Load & Boost */
+.throttle-bar-track {
+  width: 100%;
+  height: 10px;
+  background: #1c202a;
+  border-radius: 5px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.throttle-bar-fill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--porsche-gold) 0%, var(--porsche-red) 100%);
+  transition: width 0.05s ease-out;
+}
+
+.throttle-boost-meter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.boost-label {
+  color: #7b8394;
+}
+
+.boost-val {
+  color: var(--porsche-yellow);
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   RIGHT SIDEBAR: VIRTUAL RIG & PADDLE SHIFTERS
+   ========================================================================== */
+
+.input-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.85rem;
+}
+
+.tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  background: #161821;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: #8c93a4;
+  font-family: var(--font-condensed);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+  background: #1f232f;
+  color: #ffffff;
+}
+
+.tab-btn.active {
+  background: linear-gradient(135deg, #242937 0%, #151821 100%);
+  border-color: var(--porsche-gold);
+  color: var(--porsche-gold);
+}
+
+.tab-content {
+  display: none;
+}
+.tab-content.active {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Billet Aluminum Throttle Pedal */
+.virtual-pedal-card {
+  background: linear-gradient(180deg, #161820 0%, #0f1116 100%);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.pedal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-condensed);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--porsche-gold);
+}
+
+.pedal-hint {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: #7b8394;
+}
+
+.pedal-slider-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 110px;
+  position: relative;
+  padding: 0.5rem 0;
+}
+
+#sim-pedal-slider {
+  position: absolute;
+  width: 90px;
+  height: 90px;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 5;
+}
+
+.pedal-travel-visual {
+  width: 65px;
+  height: 100px;
+  background: #0d0f14;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: flex-end;
+  padding: 4px;
+  box-shadow: inset 0 2px 6px #000;
+}
+
+.pedal-face {
+  width: 100%;
+  height: 100%;
+  background: var(--bezel-aluminum);
+  border-radius: 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.6), 0 4px 10px rgba(0, 0, 0, 0.7);
+  transition: transform 0.08s ease;
+}
+
+.pedal-grooves {
+  width: 75%;
+  height: 40px;
+  background: repeating-linear-gradient(
+    180deg,
+    #14161b 0px,
+    #14161b 4px,
+    transparent 4px,
+    transparent 9px
+  );
+  border-radius: 2px;
+}
+
+.pedal-text {
+  font-family: var(--font-condensed);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #14161b;
+}
+
+.pedal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.pedal-btn {
+  padding: 0.55rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-condensed);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.brake-btn {
+  background: linear-gradient(135deg, #3d1217 0%, #1c0a0c 100%);
+  color: #ff526c;
+}
+.brake-btn:active {
+  background: var(--porsche-red);
+  color: #ffffff;
+}
+
+.gas-btn {
+  background: linear-gradient(135deg, #2b2512 0%, #161209 100%);
+  color: var(--porsche-yellow);
+}
+.gas-btn:active {
+  background: var(--porsche-yellow);
+  color: #000000;
+}
+
+/* Scenarios List */
+.scenarios-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.scenario-btn {
+  display: flex;
+  flex-direction: column;
+  padding: 0.55rem 0.8rem;
+  background: #171922;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  text-align: left;
+}
+
+.scenario-btn:hover {
+  background: #202431;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.scenario-btn.active-demo {
+  border-color: var(--porsche-gold);
+  background: linear-gradient(90deg, rgba(196, 161, 89, 0.12) 0%, rgba(23, 25, 34, 1) 100%);
+}
+
+.sc-title {
+  font-family: var(--font-condensed);
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.sc-desc {
+  font-family: var(--font-sans);
+  font-size: 0.65rem;
+  color: #7b8394;
+  margin-top: 0.1rem;
+}
+
+.scenario-btn.active-demo .sc-title {
+  color: var(--porsche-gold);
+}
+
+/* Paddle Shifters */
+.paddle-shifter-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.85rem;
+  padding: 0.65rem 0.85rem;
+  background: #12141a;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.paddle-btn {
+  width: 48px;
+  height: 52px;
+  background: var(--bezel-aluminum);
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #12141a;
+  font-family: var(--font-display);
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.6), 0 4px 10px rgba(0, 0, 0, 0.6);
+  transition: transform 0.08s ease;
+}
+
+.paddle-btn:active {
+  transform: translateY(2px);
+  background: var(--porsche-gold);
+}
+
+.paddle-sub {
+  font-size: 0.58rem;
+  font-family: var(--font-condensed);
+  letter-spacing: 0.05em;
+  margin-top: -2px;
+}
+
+.shifter-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.shifter-mode-label {
+  font-family: var(--font-condensed);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.text-link-btn {
+  background: none;
+  border: none;
+  color: var(--porsche-gold);
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  cursor: pointer;
+  text-decoration: underline;
+  margin-top: 0.15rem;
+}
+
+/* Sensor Telemetry Grid */
+.sensor-instruction-card {
+  padding: 0.65rem;
+  background: #181b24;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 0.75rem;
+}
+
+.sensor-instruction-card h4 {
+  font-family: var(--font-condensed);
+  font-size: 0.88rem;
+  color: var(--porsche-gold);
+  margin-bottom: 0.25rem;
+}
+
+.sensor-instruction-card p {
+  font-size: 0.7rem;
+  color: #8c93a4;
+  line-height: 1.35;
+}
+
+.sensor-activate-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem;
+  background: linear-gradient(135deg, #2b2512 0%, #161209 100%);
+  border: 1px solid var(--porsche-gold);
+  border-radius: var(--radius-sm);
+  color: var(--porsche-gold);
+  font-family: var(--font-condensed);
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-bottom: 0.5rem;
+}
+
+.calibrate-btn {
+  width: 100%;
+  padding: 0.45rem;
+  background: #1a1d26;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: #ffffff;
+  font-family: var(--font-condensed);
+  font-size: 0.75rem;
+  cursor: pointer;
+  margin-bottom: 0.75rem;
+}
+
+.sensor-telemetry-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.sensor-cell {
+  background: #14161e;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.sensor-cell-label {
+  font-family: var(--font-condensed);
+  font-size: 0.62rem;
+  color: #7b8394;
+}
+
+.sensor-cell-val {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-top: 0.1rem;
+}
+
+/* ==========================================================================
+   CARPLAY / PCM TRACK TELEMETRY MODAL
+   ========================================================================== */
+
+.carplay-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.92);
+  backdrop-filter: blur(16px);
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.carplay-modal.active {
+  display: flex;
+}
+
+.carplay-hud-container {
+  width: 100%;
+  max-width: 1200px;
+  background: linear-gradient(180deg, #151821 0%, #0d0f14 100%);
+  border: 1px solid var(--border-gold);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9);
+}
+
+.hud-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(196, 161, 89, 0.25);
+  padding-bottom: 0.85rem;
+}
+
+.hud-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 0.85rem;
+}
+
+.hud-logo {
+  font-family: var(--font-condensed);
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #ffffff;
+}
+
+.hud-engine-tag {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  color: var(--porsche-gold);
+  letter-spacing: 0.08em;
+}
+
+.hud-close-btn {
+  padding: 0.45rem 1rem;
+  background: #242836;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-sm);
+  color: #ffffff;
+  font-family: var(--font-condensed);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hud-main-view {
+  display: grid;
+  grid-template-columns: 220px 1fr 180px;
+  align-items: center;
+  gap: 2rem;
+}
+
+.hud-gear-giant {
+  font-family: var(--font-display);
+  font-size: 8rem;
+  font-weight: 700;
+  color: var(--vdo-amber);
+  text-shadow: 0 0 30px var(--vdo-amber-glow);
+  text-align: center;
+  line-height: 1;
+  background: rgba(14, 11, 7, 0.85);
+  border: 1px solid rgba(255, 154, 0, 0.35);
+  border-radius: var(--radius-md);
+  padding: 1rem 0;
+}
+
+.hud-center-cluster {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.hud-speed-giant {
+  font-family: var(--font-display);
+  font-size: 6.5rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #ffffff;
+}
+
+.hud-speed-unit {
+  font-family: var(--font-condensed);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--porsche-gold);
+  letter-spacing: 0.15em;
+  margin-top: -5px;
+}
+
+.hud-rpm-bar-container {
+  width: 100%;
+  height: 22px;
+  background: #181b24;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  margin-top: 1.2rem;
+}
+
+.hud-rpm-bar-fill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--porsche-gold) 0%, var(--porsche-yellow) 70%, var(--porsche-red) 100%);
+  transition: width 0.05s ease-out;
+}
+
+.hud-rpm-text-row {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: #8c93a4;
+}
+
+.hud-pedal-load-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hud-load-label {
+  font-family: var(--font-condensed);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #8c93a4;
+}
+
+.hud-load-bar-v {
+  width: 24px;
+  height: 140px;
+  background: #181b24;
+  border-radius: var(--radius-full);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.hud-load-bar-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 0%;
+  background: linear-gradient(0deg, var(--porsche-gold), var(--porsche-red));
+  transition: height 0.05s ease-out;
+}
+
+.hud-load-pct {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--porsche-yellow);
+}
+
+.hud-footer-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 1rem;
+}
+
+.hud-paddle-btn {
+  padding: 0.75rem 1.85rem;
+  background: var(--bezel-aluminum);
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  border-radius: var(--radius-sm);
+  color: #12141a;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+}
+
+.hud-paddle-btn:active {
+  background: var(--porsche-gold);
+}
+
+.hud-profile-pill {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: #9aa2b1;
+}
+
+/* ==========================================================================
+   TIRE ACOUSTICS & STEERING DYNAMICS STYLES
+   ========================================================================== */
+
+/* Porsche Toggle Switch */
+.porsche-toggle {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.porsche-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.porsche-toggle .toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #242936;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: 0.25s ease;
+  border-radius: 20px;
+}
+
+.porsche-toggle .toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 2px;
+  bottom: 2px;
+  background-color: #ffffff;
+  transition: 0.25s ease;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.porsche-toggle input:checked + .toggle-slider {
+  background-color: var(--porsche-red);
+  border-color: var(--porsche-red);
+}
+
+.porsche-toggle input:checked + .toggle-slider:before {
+  transform: translateX(18px);
+  background-color: #ffffff;
+}
+
+.tire-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.toggle-status-text {
+  font-family: var(--font-condensed);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #d6dbe6;
+}
+
+/* Tire Compound Spec Buttons */
+.tire-compound-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tuning-subhead {
+  font-family: var(--font-condensed);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--porsche-gold);
+}
+
+.compound-btn-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.3rem;
+}
+
+.compound-btn {
+  padding: 0.35rem 0.2rem;
+  background: #191c24;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: #8f98a8;
+  font-family: var(--font-condensed);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.compound-btn:hover {
+  background: #242936;
+  color: #ffffff;
+}
+
+.compound-btn.active {
+  background: linear-gradient(135deg, #2b3242 0%, #1a1e27 100%);
+  border-color: var(--porsche-gold);
+  color: var(--porsche-gold);
+  box-shadow: inset 0 0 8px rgba(196, 161, 89, 0.2);
+}
+
+/* G-Force Friction Radar Layout */
+.g-radar-container {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.2rem 0;
+}
+
+#g-radar-canvas {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: radial-gradient(circle at center, #171a23 0%, #0c0e12 100%);
+  border: 1px solid rgba(196, 161, 89, 0.3);
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.7);
+  flex-shrink: 0;
+}
+
+.g-radar-telemetry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+}
+
+.g-readout-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.g-sublabel {
+  font-family: var(--font-condensed);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #7b8396;
+}
+
+.g-readout-val {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+/* Steering Rig Card */
+.steering-card {
+  background: #171922;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.85rem;
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.steering-slider-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+#sim-steering-slider {
+  width: 100%;
+  accent-color: var(--porsche-gold);
+  height: 6px;
+  cursor: pointer;
+}
+
+.steering-readout-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: #8c95a6;
+}
+
+.steering-g-preview {
+  color: var(--porsche-gold);
+  font-weight: 700;
+}
+
+.steering-btn-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0.35rem;
+}
+
+.steer-action-btn,
+.steer-center-btn {
+  padding: 0.45rem 0.5rem;
+  background: #202430;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: #d2d6df;
+  font-family: var(--font-condensed);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.steer-action-btn:hover,
+.steer-center-btn:hover {
+  background: #2a3142;
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.steer-action-btn:active,
+.steer-action-btn.active {
+  background: var(--porsche-red);
+  color: #ffffff;
+  border-color: var(--porsche-red);
+  box-shadow: 0 0 8px rgba(213, 0, 28, 0.4);
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .main-layout {
+    grid-template-columns: 280px 1fr;
+  }
+  .control-panel {
+    grid-column: span 2;
+  }
+}
