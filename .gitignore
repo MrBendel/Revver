@@ -14,3 +14,10 @@ node_modules/
 dist/
 tmp/
 *.log
+.gradle/
+build/
+android/.gradle/
+android/build/
+android/app/build/
+android/app/src/main/assets/
+secrets/
