@@ -1,0 +1,172 @@
+name: Trigger Play Store Build from PR Hashtag
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      track:
+        description: 'Google Play Track (internal, alpha, beta, production)'
+        required: true
+        default: 'internal'
+        type: choice
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
+      status:
+        description: 'Release status (completed, draft, inProgress, halted)'
+        required: true
+        default: 'completed'
+        type: choice
+        options:
+          - completed
+          - draft
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  deploy-playstore:
+    name: Build & Upload to Play Store
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'pull_request' &&
+        (contains(github.event.pull_request.body, '#deploy-playstore') || contains(github.event.pull_request.body, '#build-and-deploy'))
+      ) || (
+        github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request &&
+        (contains(github.event.comment.body, '#deploy-playstore') || contains(github.event.comment.body, '#build-and-deploy'))
+      )
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Add reaction to comment
+        if: github.event_name == 'issue_comment'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              await github.rest.reactions.createForIssueComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: context.payload.comment.id,
+                content: 'rocket'
+              });
+            } catch (err) {
+              console.log('Reaction note:', err.message);
+            }
+
+      - name: Add reaction to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              await github.rest.reactions.createForIssue({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                content: 'rocket'
+              });
+            } catch (err) {
+              console.log('Reaction note:', err.message);
+            }
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || (github.event_name == 'issue_comment' && format('refs/pull/{0}/head', github.event.issue.number)) || github.ref }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+          log-accepted-android-sdk-licenses: false
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Sync Web Application Assets into Android
+        run: |
+          mkdir -p android/app/src/main/assets
+          cp index.html style.css app.js audio_engine.js drivetrain.js engine_sim_processor.js sensors.js android/app/src/main/assets/
+          cp -r sounds android/app/src/main/assets/
+          echo "Assets synced successfully:"
+          ls -la android/app/src/main/assets/
+
+      - name: Decode Release Keystore
+        id: keystore
+        run: |
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "ERROR: GitHub secret ANDROID_KEYSTORE_BASE64 is missing!"
+            exit 1
+          fi
+          mkdir -p secrets
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > secrets/revver-upload.keystore
+          echo "keystore_path=${PWD}/secrets/revver-upload.keystore" >> $GITHUB_OUTPUT
+
+      - name: Set Android Export Version
+        id: version
+        run: |
+          EPOCH_2020=1577836800
+          NOW=$(date +%s)
+          VERSION_CODE=$((NOW - EPOCH_2020))
+          VERSION_NAME="1.0.0-internal.${VERSION_CODE}"
+          echo "version_code=${VERSION_CODE}" >> $GITHUB_OUTPUT
+          echo "version_name=${VERSION_NAME}" >> $GITHUB_OUTPUT
+          echo "Building Revver version: ${VERSION_NAME} (code: ${VERSION_CODE})"
+
+      - name: Build Android App Bundle (AAB)
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ steps.keystore.outputs.keystore_path }}
+          ANDROID_KEYSTORE_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          cd android
+          gradle bundleRelease \
+            -PversionCode=${{ steps.version.outputs.version_code }} \
+            -PversionName="${{ steps.version.outputs.version_name }}"
+
+      - name: Upload to Google Play
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_JSON_KEY }}
+          packageName: com.platypus.revver
+          releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
+          track: ${{ github.event.inputs.track || 'internal' }}
+          status: ${{ github.event.inputs.status || 'completed' }}
+
+      - name: Post Success Comment
+        if: success() && (github.event_name == 'pull_request' || github.event_name == 'issue_comment')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              const issueNumber = context.payload.issue ? context.payload.issue.number : context.payload.pull_request.number;
+              const vName = '${{ steps.version.outputs.version_name }}';
+              const vCode = '${{ steps.version.outputs.version_code }}';
+              const track = '${{ github.event.inputs.track || "internal" }}';
+
+              const body = `🚀 **Revver Play Store Build Published!**\n\n- **Package**: \`com.platypus.revver\`\n- **Version Name**: \`${vName}\`\n- **Version Code**: \`${vCode}\`\n- **Track**: Google Play ${track.toUpperCase()} Testing\n\nTesters will receive the update shortly on their devices via Google Play!`;
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                body: body
+              });
+            } catch (err) {
+              console.log('Comment note:', err.message);
+            }

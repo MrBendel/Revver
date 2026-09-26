@@ -1,0 +1,47 @@
+name: Android Build & Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-android:
+    name: Build Android Bundle & APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Sync Web Application Assets
+        run: |
+          mkdir -p android/app/src/main/assets
+          cp index.html style.css app.js audio_engine.js drivetrain.js engine_sim_processor.js sensors.js android/app/src/main/assets/
+          cp -r sounds android/app/src/main/assets/
+
+      - name: Build Debug APK
+        run: |
+          cd android
+          gradle assembleDebug
+
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: revver-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
