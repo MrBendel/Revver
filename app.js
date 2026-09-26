@@ -306,12 +306,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function updateShiftModeLabel() {
     if (drivetrain.isManualMode) {
-      hudShiftMode.textContent = 'MANUAL';
-      shifterModeIndicator.textContent = 'MANUAL PADDLES';
+      if (hudShiftMode) hudShiftMode.textContent = 'MANUAL';
+      if (shifterModeIndicator) shifterModeIndicator.textContent = 'MANUAL PADDLES';
     } else {
-      const modeName = drivetrain.driveMode.toUpperCase();
-      hudShiftMode.textContent = `AUTO • ${modeName}`;
-      shifterModeIndicator.textContent = `AUTO (${modeName})`;
+      const modeName = (drivetrain.driveMode || 'city').toUpperCase();
+      if (hudShiftMode) hudShiftMode.textContent = `AUTO • ${modeName}`;
+      if (shifterModeIndicator) shifterModeIndicator.textContent = `AUTO (${modeName})`;
     }
   }
 

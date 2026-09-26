@@ -42,11 +42,11 @@ class RevverAudioEngine {
         sampleRpm: 3200,
         redlineRpm: 7500,
         pitchScale: 0.50,
-        subBassGain: 0.90,
-        pipeResonance: 105,   // Hz (exhaust pipe column resonance)
-        pipeQ: 2.8,
-        mufflerCutoff: 1000,  // Hz (muffler chamber low-pass)
-        pulseWidth: 130,      // degrees (exhaust valve open window)
+        subBassGain: 1.15,
+        pipeResonance: 88,    // Hz (deep American V8 crossplane rumble)
+        pipeQ: 2.2,
+        mufflerCutoff: 650,   // Hz (warm low-pass)
+        pulseWidth: 175,      // degrees (broad realistic valve blowdown window)
         compressionRatio: 11.0,
         // Classic American crossplane V8 firing cadence: 1-5-4-8-6-3-7-2
         firingAngles: [0, 90, 270, 360, 450, 540, 630, 720],
@@ -66,11 +66,11 @@ class RevverAudioEngine {
         sampleRpm: 3500,
         redlineRpm: 9000,
         pitchScale: 0.55,
-        subBassGain: 0.65,
-        pipeResonance: 165,
-        pipeQ: 2.6,
-        mufflerCutoff: 1800,
-        pulseWidth: 120,
+        subBassGain: 1.10,
+        pipeResonance: 92,
+        pipeQ: 2.3,
+        mufflerCutoff: 780,
+        pulseWidth: 172,
         compressionRatio: 13.3,
         firingAngles: [0, 120, 240, 360, 480, 600],
         exhaustBanks: [0, 1, 0, 1, 0, 1],
@@ -89,11 +89,11 @@ class RevverAudioEngine {
         sampleRpm: 3200,
         redlineRpm: 7800,
         pitchScale: 0.52,
-        subBassGain: 0.72,
-        pipeResonance: 155,
-        pipeQ: 2.7,
-        mufflerCutoff: 1650,
-        pulseWidth: 124,
+        subBassGain: 1.12,
+        pipeResonance: 95,
+        pipeQ: 2.4,
+        mufflerCutoff: 720,
+        pulseWidth: 170,
         compressionRatio: 11.5,
         firingAngles: [0, 120, 240, 360, 480, 600],
         exhaustBanks: [0, 1, 0, 1, 0, 1],
@@ -112,11 +112,11 @@ class RevverAudioEngine {
         sampleRpm: 4000,
         redlineRpm: 8500,
         pitchScale: 0.60,
-        subBassGain: 0.48,
-        pipeResonance: 235,
-        pipeQ: 3.2,
-        mufflerCutoff: 2850,
-        pulseWidth: 108,
+        subBassGain: 0.95,
+        pipeResonance: 105,
+        pipeQ: 2.6,
+        mufflerCutoff: 950,
+        pulseWidth: 168,
         compressionRatio: 12.0,
         firingAngles: [0, 72, 144, 216, 288, 360, 432, 504, 576, 648],
         exhaustBanks: [0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
@@ -135,11 +135,11 @@ class RevverAudioEngine {
         sampleRpm: 3000,
         redlineRpm: 7400,
         pitchScale: 0.50,
-        subBassGain: 0.75,
-        pipeResonance: 130,
-        pipeQ: 2.4,
-        mufflerCutoff: 1350,
-        pulseWidth: 125,
+        subBassGain: 1.15,
+        pipeResonance: 86,
+        pipeQ: 2.2,
+        mufflerCutoff: 680,
+        pulseWidth: 172,
         compressionRatio: 9.0,
         firingAngles: [0, 120, 240, 360, 480, 600],
         exhaustBanks: [0, 1, 0, 1, 0, 1],
@@ -158,11 +158,11 @@ class RevverAudioEngine {
         sampleRpm: 3200,
         redlineRpm: 8300,
         pitchScale: 0.52,
-        subBassGain: 0.70,
-        pipeResonance: 145,
-        pipeQ: 2.5,
-        mufflerCutoff: 1550,
-        pulseWidth: 135,
+        subBassGain: 1.12,
+        pipeResonance: 90,
+        pipeQ: 2.3,
+        mufflerCutoff: 700,
+        pulseWidth: 170,
         compressionRatio: 8.5,
         firingAngles: [0, 144, 288, 432, 576],
         exhaustBanks: [0, 0, 0, 0, 0],
@@ -348,6 +348,7 @@ class RevverAudioEngine {
    * Turbo Spool & Blow-Off Valve
    */
   setupTurboNodes() {
+    if (!this.ctx || this.turboGain) return;
     const t = this.ctx.currentTime;
     this.turboOsc = this.ctx.createOscillator();
     this.turboOsc.type = 'sine';
@@ -372,7 +373,7 @@ class RevverAudioEngine {
    * 3. Sampled Tire Skid & Squeal (Real recorded 48kHz rubber-on-asphalt skid PCM loop - zero oscillators!)
    */
   setupTireAcoustics() {
-    if (!this.ctx) return;
+    if (!this.ctx || this.tireBus) return;
     const t = this.ctx.currentTime;
 
     // Master Tire Bus connected to masterGain
@@ -728,8 +729,18 @@ class RevverAudioEngine {
     // Fade in engine bus
     this.engineBus.gain.setTargetAtTime(0.78, t, 0.04);
 
+    // Always play high-fidelity mechanical starter motor cranking sound (compression struggles & DC motor hum)
+    this.playOneShot(this.starterBuffer, 0.90);
+
+    let catchTriggered = false;
+    const triggerCatchSound = () => {
+      if (catchTriggered) return;
+      catchTriggered = true;
+      this.playOneShot(this.catchBuffer, 1.0);
+    };
+
     if (this.isWorkletActive && this.engineSimNode) {
-      // Engage physical starter in worklet (procedural DC armature whine, TDC compression bogs & flare)
+      // Engage physical starter in worklet
       this.engineSimNode.port.postMessage({ type: 'START_ENGINE' });
 
       // Track starter cadence and catch state
@@ -737,6 +748,7 @@ class RevverAudioEngine {
         if (this.engineState === 'CRANKING') {
           if (callbacks.onProgress) callbacks.onProgress({ state: 'CRANKING', rpm: this.currentRpm || 195 });
         } else if (this.engineState === 'STARTING') {
+          triggerCatchSound();
           if (callbacks.onProgress) callbacks.onProgress({ state: 'STARTING', rpm: this.currentRpm || 2150 });
         } else if (this.engineState === 'RUNNING') {
           clearInterval(crankPoll);
@@ -747,6 +759,7 @@ class RevverAudioEngine {
       // Failsafe timeout: ensure ignition catch transition happens even if worklet message is delayed
       setTimeout(() => {
         if (this.engineState === 'CRANKING') {
+          triggerCatchSound();
           this.engineSimNode.port.postMessage({
             type: 'SET_STATE',
             ignition: true,
@@ -766,14 +779,12 @@ class RevverAudioEngine {
             }
           }, 850);
         }
-      }, 1100);
+      }, 950);
 
       return;
     }
 
     // Fallback if worklet not supported
-    this.playOneShot(this.starterBuffer, 0.85);
-
     const crankInterval = setInterval(() => {
       if (this.engineState !== 'CRANKING') {
         clearInterval(crankInterval);
@@ -792,7 +803,7 @@ class RevverAudioEngine {
       if (this.engineState !== 'CRANKING') return;
       this.engineState = 'STARTING';
 
-      this.playOneShot(this.catchBuffer, 0.95);
+      triggerCatchSound();
       this.applyProfile(this.activeProfile);
 
       const tNow = this.ctx.currentTime;
@@ -830,6 +841,9 @@ class RevverAudioEngine {
 
     const p = this.activeProfile;
     const startRpm = this.currentRpm || p.idleRpm;
+
+    // Always play physical shutdown spin-down sound (closed throttle compression thuds & vacuum sigh)
+    this.playOneShot(this.shutdownBuffer, 0.95);
 
     if (this.isWorkletActive && this.engineSimNode) {
       // Signal physical shutdown to engine-sim worklet

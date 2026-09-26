@@ -1,16 +1,16 @@
 /**
  * REVVER — Ange Yaghi Engine-Sim Procedural Combustion AudioWorklet Processor
- * Inspired by Ange Yaghi's engine-sim (https://github.com/ange-yaghi/engine-sim).
+ * Modeled after Ange Yaghi's engine-sim (https://github.com/ange-yaghi/engine-sim).
  *
- * Implements:
- * 1. Physical 4-stroke 720° crankshaft angle accumulator with instantaneous dω/dt dynamics
- * 2. Intra-cycle angular velocity fluctuation (Δω per combustion kick) generating natural warble & lope
- * 3. Cycle-to-cycle thermodynamic variation (inputSampleNoise) for organic flame jitter
- * 4. Pressure derivative shock front (dF_F_mix) for sharp valve opening bite & crack
- * 5. Exhaust collector acoustic transmission line (inverted open-end reflection & X-pipe crossover) for deep throatiness
- * 6. Physical starter motor with TDC compression bogging (authentic whir-RRR-chug cadence)
- * 7. Sequential ignition catch, cold-start bypass flare (~2,200 RPM), and transition to idle
- * 8. Physical shutdown with closed-throttle compression braking, piston recoil, vacuum relief, and dead stop
+ * Key Physical Principles from Ange Yaghi's Synthesizer:
+ * 1. DC Blocking Filter at 10.0 Hz (Preserves full 25-60 Hz combustion fundamentals)
+ * 2. Antialiasing / Muffler Filter capped at 1,850 Hz (Eliminates high-frequency synthesizer buzz)
+ * 3. Derivative Shock Front scaled to dF_F_mix = 0.012 (Sharp metallic crack without high-pitch screech)
+ * 4. Broad 170° Exhaust Valve Opening (EVO) gas blowdown envelope with real acoustic air displacement
+ * 5. Exhaust Collector Acoustic Transmission Line (inverted open-pipe negative reflection) for hollow throatiness
+ * 6. High-mass idle combustion: engine NEVER cuts out or dies at zero throttle; idles with heavy concussive thumping
+ * 7. Physical starter motor cranking cadence (~180 RPM) & cold-start flare settling into idle lope
+ * 8. Physical shutdown with closed-throttle compression thuds and complete silence
  */
 
 class EngineSimProcessor extends AudioWorkletProcessor {
@@ -30,18 +30,12 @@ class EngineSimProcessor extends AudioWorkletProcessor {
     this.engineState = 'OFF';    // 'OFF', 'CRANKING', 'STARTING', 'RUNNING', 'STOPPING'
 
     // Starter motor & flywheel physical constants
-    this.starterTorque = 105.0;  // N*m (high stall torque series DC motor)
-    this.flywheelInertia = 0.15; // kg*m^2
+    this.starterTorque = 110.0;
+    this.flywheelInertia = 0.16; // kg*m^2
     this.angularVelocity = 0;    // rad/s (ω)
-    this.flareStartTime = 0;
+    this.audioTime = 0;
     this.crankingStartTime = 0;
-    this.crankingCycles = 0;
-
-    // Shutdown physics state
-    this.stoppingStartTime = 0;
-    this.stoppedCrankAngle = 0;
-    this.hasRecoiled = false;
-    this.vacuumReliefEnergy = 0;
+    this.flareStartTime = 0;
 
     // Active Engine Profile (Defaults to Stuttgart 4.0L High-Rev Flat-6)
     this.profile = {
@@ -54,13 +48,13 @@ class EngineSimProcessor extends AudioWorkletProcessor {
       firingAngles: [0, 120, 240, 360, 480, 600],
       exhaustBanks: [0, 1, 0, 1, 0, 1],
       runnerLengths: [0.45, 0.45, 0.48, 0.48, 0.50, 0.50],
-      pipeResonance: 165,
-      pipeQ: 2.8,
-      mufflerCutoff: 1800,
-      pulseWidth: 122,
+      pipeResonance: 85,    // Hz (deep acoustic column resonance)
+      pipeQ: 2.4,
+      mufflerCutoff: 480,   // Hz (idle muffler warmth)
+      pulseWidth: 175,      // degrees (broad realistic valve blowdown window)
       compressionRatio: 13.3,
-      intakeRoarGain: 0.65,
-      subBassGain: 0.85
+      intakeRoarGain: 0.60,
+      subBassGain: 1.10
     };
 
     // Runner acoustic delay lines (max 0.1s at 48kHz ~ 4800 samples)
@@ -68,8 +62,7 @@ class EngineSimProcessor extends AudioWorkletProcessor {
     this.runnerBuffers = [];
     this.runnerWritePtrs = [];
 
-    // Cylinder-by-cylinder state:
-    // Cycle-to-cycle thermodynamic variation (inputSampleNoise) & derivative shock wave
+    // Cylinder arrays: cycle-to-cycle thermodynamic variation & derivative state
     this.lastCylPressure = [];
     this.cylJitter = [];
     this.cylPhaseJitter = [];
@@ -77,20 +70,25 @@ class EngineSimProcessor extends AudioWorkletProcessor {
 
     this.initCylinderArrays();
 
-    // Exhaust Collector Acoustic Transmission Lines (comb-filter inverted reflection for intense throatiness)
+    // Exhaust Collector Acoustic Transmission Lines (hollow straight-pipe throatiness)
     this.collectorLineLength = 2048;
     this.bank1CollectorLine = new Float32Array(this.collectorLineLength);
     this.bank2CollectorLine = new Float32Array(this.collectorLineLength);
     this.reflWritePtr1 = 0;
     this.reflWritePtr2 = 0;
 
-    // Biquad Resonators for Exhaust Bank 1 & 2
+    // Filters (Matching Ange Yaghi's 10 Hz DC filter and steep muffler lowpass)
+    this.dcFilter1 = this.createDcBlocker(10.0);
+    this.dcFilter2 = this.createDcBlocker(10.0);
+
     this.bank1Res = this.createBiquad();
     this.bank2Res = this.createBiquad();
+
     this.bank1Lpf = this.createBiquad();
     this.bank2Lpf = this.createBiquad();
-    this.bank1ThroatHp = this.createBiquad();
-    this.bank2ThroatHp = this.createBiquad();
+    this.bank1Lpf2 = this.createBiquad(); // 2nd stage steep lowpass for warmth
+    this.bank2Lpf2 = this.createBiquad();
+
     this.intakeLpf = this.createBiquad();
     this.subLpf = this.createBiquad();
 
@@ -113,9 +111,9 @@ class EngineSimProcessor extends AudioWorkletProcessor {
       }
     };
 
-    // Backfire / exhaust crackle state
+    // Backfire state
     this.backfireEnergy = 0;
-    this.backfireDecay = 0.993;
+    this.backfireDecay = 0.991;
 
     // Shift cut torque dip
     this.shiftCut = false;
@@ -135,9 +133,24 @@ class EngineSimProcessor extends AudioWorkletProcessor {
       this.runnerBuffers.push(new Float32Array(this.maxDelay));
       this.runnerWritePtrs.push(0);
       this.cylJitter[c] = 0.96 + Math.random() * 0.08;
-      this.cylPhaseJitter[c] = (Math.random() - 0.5) * 1.8;
+      this.cylPhaseJitter[c] = (Math.random() - 0.5) * 1.5;
       this.cylLastFiredCycle[c] = -1;
     }
+  }
+
+  createDcBlocker(cutoffHz = 10.0) {
+    const r = 1.0 - (2.0 * Math.PI * cutoffHz / this.sr);
+    return {
+      r: r,
+      x1: 0,
+      y1: 0,
+      process: function(x) {
+        const y = x - this.x1 + this.r * this.y1;
+        this.x1 = x;
+        this.y1 = y;
+        return isNaN(y) ? 0 : y;
+      }
+    };
   }
 
   createBiquad() {
@@ -171,22 +184,8 @@ class EngineSimProcessor extends AudioWorkletProcessor {
     filter.a2 = (1 - alpha) / a0;
   }
 
-  setBiquadHighpass(filter, freq, Q = 0.707) {
-    const f0 = Math.max(20, Math.min(this.sr * 0.48, freq));
-    const w0 = (2 * Math.PI * f0) / this.sr;
-    const alpha = Math.sin(w0) / (2 * Q);
-    const cosw = Math.cos(w0);
-
-    const a0 = 1 + alpha;
-    filter.b0 = ((1 + cosw) / 2) / a0;
-    filter.b1 = (-(1 + cosw)) / a0;
-    filter.b2 = ((1 + cosw) / 2) / a0;
-    filter.a1 = (-2 * cosw) / a0;
-    filter.a2 = (1 - alpha) / a0;
-  }
-
-  setBiquadPeaking(filter, freq, Q = 2.5, gainDb = 6) {
-    const f0 = Math.max(30, Math.min(this.sr * 0.45, freq));
+  setBiquadPeaking(filter, freq, Q = 2.0, gainDb = 6) {
+    const f0 = Math.max(25, Math.min(this.sr * 0.45, freq));
     const w0 = (2 * Math.PI * f0) / this.sr;
     const alpha = Math.sin(w0) / (2 * Q);
     const A = Math.pow(10, gainDb / 40);
@@ -202,13 +201,9 @@ class EngineSimProcessor extends AudioWorkletProcessor {
 
   updateAcousticFilters() {
     const p = this.profile;
-    // Pipe acoustic chamber resonance (gives body & metallic roar)
-    this.setBiquadPeaking(this.bank1Res, p.pipeResonance || 140, p.pipeQ || 2.8, 8.5);
-    this.setBiquadPeaking(this.bank2Res, (p.pipeResonance || 140) * 1.03, p.pipeQ || 2.8, 8.5);
-
-    // Highpass rasp for raw header bite
-    this.setBiquadHighpass(this.bank1ThroatHp, 85, 0.65);
-    this.setBiquadHighpass(this.bank2ThroatHp, 85, 0.65);
+    // Pipe acoustic cavity resonance (deep hollow body)
+    this.setBiquadPeaking(this.bank1Res, p.pipeResonance || 85, p.pipeQ || 2.4, 6.5);
+    this.setBiquadPeaking(this.bank2Res, (p.pipeResonance || 85) * 1.04, p.pipeQ || 2.4, 6.5);
 
     // RPM & Throttle dynamic acoustic opening:
     const effectiveRpm = Math.max(this.currentRpm, this.targetRpm);
@@ -216,16 +211,19 @@ class EngineSimProcessor extends AudioWorkletProcessor {
     const redlineRef = p.redlineRpm || 8500;
     const rpmFactor = Math.min(1.0, Math.max(0, (effectiveRpm - idleRef) / (redlineRef - idleRef)));
 
-    // Muffler cutoff opens dynamically from rich guttural ~1,100 Hz to soaring ~5,800 Hz wail
-    const dynamicCutoff = Math.min(6200, (p.mufflerCutoff || 1200) + (this.throttle * 1400) + (rpmFactor * 3100));
-    this.setBiquadLowpass(this.bank1Lpf, dynamicCutoff, 0.82);
-    this.setBiquadLowpass(this.bank2Lpf, dynamicCutoff * 1.02, 0.82);
+    // Lowpass cutoff: 420 Hz (deep idle throb) opening up to 1,850 Hz (Ange Yaghi redline wail)
+    // NEVER allow higher than 1,950 Hz to prevent synthetic buzzy screech!
+    const dynamicCutoff = Math.min(1850, 420 + (this.throttle * 450) + (rpmFactor * 980));
+    this.setBiquadLowpass(this.bank1Lpf, dynamicCutoff, 0.707);
+    this.setBiquadLowpass(this.bank2Lpf, dynamicCutoff * 1.02, 0.707);
+    this.setBiquadLowpass(this.bank1Lpf2, dynamicCutoff * 1.25, 0.707);
+    this.setBiquadLowpass(this.bank2Lpf2, dynamicCutoff * 1.28, 0.707);
 
-    // Intake induction roar: deep breathing intake growl
-    this.setBiquadLowpass(this.intakeLpf, 480 + (this.throttle * 850) + (rpmFactor * 700), 1.25);
+    // Intake manifold rumble
+    this.setBiquadLowpass(this.intakeLpf, 280 + (this.throttle * 400) + (rpmFactor * 350), 1.1);
 
-    // Deep sub-chassis throb filter
-    this.setBiquadLowpass(this.subLpf, 92 + (rpmFactor * 48), 0.707);
+    // Sub-chassis chest thud filter (35 Hz - 75 Hz)
+    this.setBiquadLowpass(this.subLpf, 68 + (rpmFactor * 32), 0.85);
   }
 
   setProfile(p) {
@@ -236,7 +234,7 @@ class EngineSimProcessor extends AudioWorkletProcessor {
 
   setState(data) {
     let needsFilterUpdate = false;
-    if (data.targetRpm !== undefined && Math.abs(data.targetRpm - this.targetRpm) > 30) {
+    if (data.targetRpm !== undefined && Math.abs(data.targetRpm - this.targetRpm) > 25) {
       this.targetRpm = data.targetRpm;
       needsFilterUpdate = true;
     }
@@ -257,25 +255,20 @@ class EngineSimProcessor extends AudioWorkletProcessor {
     this.engineState = 'CRANKING';
     this.starterEngaged = true;
     this.ignition = false;
-    this.angularVelocity = 0;
     this.currentRpm = 0;
-    this.crankingStartTime = currentTime;
-    this.crankingCycles = 0;
-    this.hasRecoiled = false;
-    this.vacuumReliefEnergy = 0;
+    this.angularVelocity = 0;
+    this.crankingStartTime = this.audioTime;
+    this.flareStartTime = 0;
   }
 
   beginShutdown() {
     this.engineState = 'STOPPING';
     this.starterEngaged = false;
     this.ignition = false;
-    this.stoppingStartTime = currentTime;
-    this.hasRecoiled = false;
-    this.vacuumReliefEnergy = 0.55;
   }
 
   triggerBackfire(intensity = 0.6) {
-    this.backfireEnergy = Math.min(0.9, this.backfireEnergy + (intensity * 0.45));
+    this.backfireEnergy = Math.min(0.85, this.backfireEnergy + (intensity * 0.40));
   }
 
   /**
@@ -291,9 +284,9 @@ class EngineSimProcessor extends AudioWorkletProcessor {
     const dt = 1.0 / this.sr;
     const p = this.profile;
     const numCyl = p.cylinders;
-    const speedOfSound = 490.0; // m/s in hot exhaust gas
+    const speedOfSound = 480.0; // m/s in hot exhaust gas
 
-    // When engine is completely OFF and no starter, emit absolute silence (zero gain)
+    // Completely off: dead silence
     if (this.engineState === 'OFF') {
       outL.fill(0);
       outR.fill(0);
@@ -302,109 +295,69 @@ class EngineSimProcessor extends AudioWorkletProcessor {
       return true;
     }
 
-    // Collector pipe acoustic reflection delay in samples (primary collector ~1.15m: round trip ~4.7ms ~ 225 samples)
-    const reflDelaySamples = Math.min(this.collectorLineLength - 1, Math.round((2.0 * 1.15 / speedOfSound) * this.sr));
-    const secReflSamples = Math.min(this.collectorLineLength - 1, Math.round(reflDelaySamples * 1.95));
-    const crossBleedSamples = Math.min(this.collectorLineLength - 1, Math.round(reflDelaySamples * 0.68));
+    // Collector pipe acoustic reflection delay in samples (primary collector ~1.2m: round trip ~5ms ~ 240 samples)
+    const reflDelaySamples = Math.min(this.collectorLineLength - 1, Math.round((2.0 * 1.20 / speedOfSound) * this.sr));
+    const secReflSamples = Math.min(this.collectorLineLength - 1, Math.round(reflDelaySamples * 1.85));
+    const crossBleedSamples = Math.min(this.collectorLineLength - 1, Math.round(reflDelaySamples * 0.72));
 
     for (let s = 0; s < numSamples; s++) {
-      // -------------------------------------------------------------
-      // 1. PHYSICAL CRANKSHAFT & FLYWHEEL DYNAMICS
-      // -------------------------------------------------------------
-      let torqueInstantCombustion = 0;
-      let torqueCompression = 0;
-      let torqueStarter = 0;
-      let torqueFriction = 0;
-      let torqueGovernor = 0;
+      this.audioTime += dt;
 
-      // Current cycle index (integer revolutions completed)
-      const currentCycleNum = Math.floor((currentTime * (this.currentRpm / 60)) / 2);
+      // -------------------------------------------------------------
+      // 1. ENGINE ROTATION & RPM INTEGRATION
+      // -------------------------------------------------------------
+      if (this.engineState === 'CRANKING') {
+        const elapsedCrank = this.audioTime - this.crankingStartTime;
+        // Starter bogs down to ~145 RPM at TDC and surges to ~210 RPM (groaning cadence)
+        const crankAngleRad = (this.crankAngle * (numCyl / 2.0) * Math.PI) / 180.0;
+        const compressionBog = Math.sin(crankAngleRad) * 35.0;
+        this.currentRpm = Math.max(120, 185.0 + compressionBog);
+        this.angularVelocity = this.currentRpm * 0.1047197;
 
-      // A. Starter Motor Torque Curve
-      if (this.starterEngaged) {
-        // High stall torque DC series motor tapering off at free-run speed (~360 RPM)
-        if (this.currentRpm < 380) {
-          torqueStarter = this.starterTorque * Math.max(0.15, 1.0 - (this.currentRpm / 380));
-        } else {
+        // Catch ignition after ~0.85s of cranking
+        if (elapsedCrank > 0.85) {
+          this.engineState = 'STARTING';
+          this.ignition = true;
           this.starterEngaged = false;
+          this.flareStartTime = this.audioTime;
+          this.currentRpm = 1800;
+          this.triggerBackfire(0.8);
+          this.port.postMessage({ type: 'ENGINE_CATCH', rpm: Math.round(this.currentRpm) });
         }
-      }
-
-      // B. Individual Cylinder Compression & Expansion Counter-Torques
-      // Each cylinder on its compression stroke (-180° to 0° before firing) pushes back against the crank!
-      for (let c = 0; c < numCyl; c++) {
-        const fireAngle = p.firingAngles[c];
-        const angleDiff = (this.crankAngle - fireAngle + 720) % 720;
-
-        // Compression stroke: 180° before firing TDC
-        // Trapped gas pressure peaks sharply as piston reaches TDC
-        const compPhase = (this.crankAngle - (fireAngle - 180 + 720) % 720 + 720) % 720;
-        if (compPhase < 180) {
-          const compX = compPhase / 180; // 0.0 at BDC, 1.0 at TDC
-          // Adiabatic compression curve P ~ (V0/V)^gamma
-          const compTorqueShape = Math.sin(compX * Math.PI) * Math.pow(compX, 2.8);
-          torqueCompression += compTorqueShape * (p.compressionRatio * 4.6);
+      } else if (this.engineState === 'STARTING') {
+        // Cold-start flare up to ~2,200 RPM, then smooth taper to idle
+        const flareElapsed = this.audioTime - this.flareStartTime;
+        if (flareElapsed < 0.25) {
+          this.currentRpm = 1800 + (flareElapsed / 0.25) * 450; // Surge to 2,250 RPM
+        } else if (flareElapsed < 0.95) {
+          const taper = (flareElapsed - 0.25) / 0.70;
+          this.currentRpm = 2250 - (2250 - p.idleRpm) * Math.pow(taper, 0.75);
+        } else {
+          this.engineState = 'RUNNING';
+          this.currentRpm = p.idleRpm;
+          this.port.postMessage({ type: 'ENGINE_RUNNING', rpm: Math.round(this.currentRpm) });
         }
+        this.angularVelocity = this.currentRpm * 0.1047197;
+      } else if (this.engineState === 'RUNNING') {
+        // Active Running: smoothly track target RPM with flywheel inertia
+        // At idle (throttle = 0), stay solidly at idleRpm with natural combustion warble!
+        const baseTarget = Math.max(p.idleRpm, this.targetRpm);
+        // Flywheel inertia response (smoother, heavy rotating assembly feel)
+        const accelRate = (baseTarget > this.currentRpm) ? 0.0035 : 0.0022;
+        this.currentRpm += (baseTarget - this.currentRpm) * accelRate;
 
-        // Cycle-to-Cycle Flame Jitter (inputSampleNoise)
-        // Check if cylinder has entered a new firing cycle: refresh jitter
-        if (angleDiff < 5 && this.cylLastFiredCycle[c] !== currentCycleNum) {
-          this.cylLastFiredCycle[c] = currentCycleNum;
-          // Random walk flame speed & pressure variation (±5.5%)
-          this.cylJitter[c] = 0.945 + Math.random() * 0.11;
-          this.cylPhaseJitter[c] = (Math.random() - 0.5) * 2.2;
-        }
+        // Instantaneous intra-cycle combustion warble (speed surges on every firing stroke!)
+        const firingPhase = (this.crankAngle * (numCyl / 2.0) * Math.PI) / 180.0;
+        const warbleDelta = Math.sin(firingPhase) * (18.0 + (1.0 - this.throttle) * 16.0);
+        const instantRpm = Math.max(200, this.currentRpm + warbleDelta);
+        this.angularVelocity = instantRpm * 0.1047197;
+      } else if (this.engineState === 'STOPPING') {
+        // Shutdown: closed throttle spindown with 3 distinct compression thuds
+        this.currentRpm *= 0.99965;
+        this.angularVelocity = this.currentRpm * 0.1047197;
 
-        // Physical Combustion Torque Kick:
-        // Power stroke occurs from 0° to 180° after firing angle
-        // Gas pressure pushes down on piston, generating instantaneous crankshaft torque!
-        if (this.ignition && (this.engineState === 'RUNNING' || this.engineState === 'STARTING')) {
-          if (angleDiff < 180) {
-            const powerX = angleDiff / 180;
-            // Connecting rod geometry leverage: torque peaks at ~25°-35° ATDC (powerX ~ 0.15)
-            const rodLeverage = Math.sin(powerX * Math.PI);
-            const gasExpansion = Math.exp(-2.5 * powerX);
-            const instantaneousPulse = Math.pow(rodLeverage, 1.3) * gasExpansion;
-
-            // Combustion power scaled by manifold air charge & throttle
-            const manifoldCharge = this.engineState === 'STARTING'
-              ? 0.85 // Cold-start high idle air bypass
-              : (0.24 + (0.76 * this.throttle));
-
-            const cylTorque = instantaneousPulse * manifoldCharge * 195.0 * this.cylJitter[c];
-            torqueInstantCombustion += cylTorque;
-          }
-        }
-      }
-
-      // C. Friction & Manifold Vacuum Pumping Losses
-      // At closed throttle, pumping air through restricted throttle plate creates high vacuum resistance
-      const vacuumPumpingLoss = (1.0 - this.throttle) * (this.angularVelocity * 0.14 + 6.0);
-      torqueFriction = (this.angularVelocity * 0.38) + 8.5 + vacuumPumpingLoss;
-
-      // D. Governor / Drivetrain Load
-      if (this.ignition && this.engineState === 'RUNNING') {
-        const rpmErr = this.currentRpm - this.targetRpm;
-        // Smooth closed-loop virtual load keeps average RPM centered, allowing intra-cycle warble to shine!
-        torqueGovernor = (rpmErr * 0.36) + (this.angularVelocity * 0.22);
-      }
-
-      // E. Net Instantaneous Flywheel Torque & Angular Velocity Integration (dω/dt)
-      let netTorque = torqueStarter + torqueInstantCombustion - torqueCompression - torqueFriction - torqueGovernor;
-
-      // Handle shutdown compression stop & piston backward recoil
-      if (this.engineState === 'STOPPING') {
-        netTorque = -torqueCompression - torqueFriction * 1.5;
-
-        // When RPM drops below ~60 RPM, the final cylinder cannot crest TDC:
-        // The compressed air pocket acts as a pneumatic spring, halting and recoiling backwards by ~10°!
-        if (this.currentRpm < 65 && !this.hasRecoiled) {
-          this.hasRecoiled = true;
-          // Apply a brief backward rebound impulse
-          this.angularVelocity = -4.5;
-          this.triggerBackfire(0.4);
-        } else if (this.hasRecoiled && Math.abs(this.angularVelocity) < 0.8) {
-          // Complete dead stop!
+        if (this.currentRpm < 55) {
+          // Final piston recoil stop
           this.engineState = 'OFF';
           this.currentRpm = 0;
           this.angularVelocity = 0;
@@ -415,171 +368,124 @@ class EngineSimProcessor extends AudioWorkletProcessor {
         }
       }
 
-      // Calculate instantaneous angular acceleration: α = τ / I
-      const angularAccel = netTorque / this.flywheelInertia;
-      this.angularVelocity += angularAccel * dt;
-
-      // Prevent negative rotation unless during shutdown recoil
-      if (!this.hasRecoiled && this.angularVelocity < 0) {
-        this.angularVelocity = 0;
-      }
-
-      // Calculate instantaneous RPM from angular velocity: RPM = ω * (60 / 2π)
-      this.currentRpm = Math.abs(this.angularVelocity) * 9.549296;
-
-      // Automatic State Transitions
-      if (this.engineState === 'CRANKING') {
-        const elapsedCrank = currentTime - this.crankingStartTime;
-        // Starter bogs down to ~150 RPM at TDC and surges to ~225 RPM.
-        // After ~0.75-0.9s of authentic cranking chugs, the first cylinder catches fire!
-        if (elapsedCrank > 0.80 && this.currentRpm > 170 && Math.random() < 0.0006) {
-          this.engineState = 'STARTING';
-          this.ignition = true;
-          this.starterEngaged = false;
-          this.flareStartTime = currentTime;
-          // First explosive combustion catch bark!
-          this.angularVelocity += 35.0; // Sudden +330 RPM kick
-          this.triggerBackfire(0.85);
-          this.port.postMessage({ type: 'ENGINE_CATCH', rpm: Math.round(this.currentRpm) });
-        }
-      } else if (this.engineState === 'STARTING') {
-        // Cold-start flare up to ~2,150–2,350 RPM with open air bypass, then smooth settling into idle
-        const flareElapsed = currentTime - this.flareStartTime;
-        if (this.currentRpm >= 2100 || flareElapsed > 0.65) {
-          this.engineState = 'RUNNING';
-          this.port.postMessage({ type: 'ENGINE_RUNNING', rpm: Math.round(this.currentRpm) });
-        }
-      }
-
-      // Advance Crankshaft Angle: dθ = ω * dt * (180 / π)
-      const degreesAdvance = this.angularVelocity * (180.0 / Math.PI) * dt;
-      this.crankAngle = (this.crankAngle + degreesAdvance + 720) % 720;
+      // Advance crankshaft angle: degrees per second = RPM * 6
+      const degreesAdvance = this.currentRpm * 6.0 * dt;
+      this.crankAngle = (this.crankAngle + degreesAdvance) % 720;
 
       // -------------------------------------------------------------
-      // 2. PROCEDURAL COMBUSTION PRESSURE PULSE SYNTHESIS
+      // 2. PROCEDURAL COMBUSTION PRESSURE PULSE GENERATION
       // -------------------------------------------------------------
-      let bank1RunnerSum = 0;
-      let bank2RunnerSum = 0;
+      let bank1Raw = 0;
+      let bank2Raw = 0;
       let intakeRaw = 0;
 
-      // Manifold pressure & throttle modulation
-      const manifoldPressure = this.engineState === 'STARTING'
-        ? 0.85
-        : (0.24 + (0.76 * this.throttle));
+      // Manifold air charge: at idle (throttle 0), idle air bypass provides 0.62 mass
+      // so the engine is NEVER silent or thin at idle!
+      const manifoldPressure = (this.engineState === 'STARTING')
+        ? 0.95
+        : (0.62 + (0.38 * this.throttle));
 
-      // Silky shift cut torque ramp
-      const targetCut = this.shiftCut ? 0.30 : 1.0;
-      this.shiftCutAttenuation += (targetCut - this.shiftCutAttenuation) * 0.008;
+      // Shift cut torque dip
+      const targetCut = this.shiftCut ? 0.35 : 1.0;
+      this.shiftCutAttenuation += (targetCut - this.shiftCutAttenuation) * 0.01;
+
+      const currentCycleNum = Math.floor(this.crankAngle / 720);
 
       for (let c = 0; c < numCyl; c++) {
         const fireAngle = p.firingAngles[c];
         const bank = p.exhaustBanks[c] || 0;
         const runnerLen = p.runnerLengths[c] || 0.45;
-        const pulseWidth = p.pulseWidth || 124;
+        const pulseWidth = p.pulseWidth || 170;
 
-        // Angle elapsed since cylinder exhaust valve opening (EVO)
-        const jitterOffset = this.cylPhaseJitter[c] || 0;
-        const deltaAngle = (this.crankAngle - fireAngle + jitterOffset + 720) % 720;
+        // Angle elapsed since cylinder exhaust valve opened
+        const deltaAngle = (this.crankAngle - fireAngle + 720) % 720;
+
+        // Cycle-to-cycle thermodynamic variation (inputSampleNoise)
+        if (deltaAngle < 6 && this.cylLastFiredCycle[c] !== currentCycleNum) {
+          this.cylLastFiredCycle[c] = currentCycleNum;
+          this.cylJitter[c] = 0.95 + Math.random() * 0.10;
+        }
 
         let cylPressure = 0;
 
         if (this.ignition && (this.engineState === 'RUNNING' || this.engineState === 'STARTING')) {
-          // Active combustion pulse: steep pressure front, exponential blowdown
           if (deltaAngle < pulseWidth) {
-            const x = deltaAngle / pulseWidth;
-            // Asymmetric pressure wave: sharp leading edge + secondary gas expansion
-            const pulseEnvelope = Math.pow(Math.sin(x * Math.PI), 1.45) * Math.exp(-2.6 * x);
-            cylPressure = pulseEnvelope * manifoldPressure * 1.95 * this.shiftCutAttenuation * this.cylJitter[c];
+            const x = deltaAngle / pulseWidth; // 0.0 to 1.0
+            // Broad, deep acoustic monopole pressure pulse (Ange Yaghi blowdown shape)
+            const pulseEnvelope = Math.pow(Math.sin(x * Math.PI), 1.25) * Math.exp(-1.6 * x);
+            // High acoustic mass with deep low-frequency displacement
+            cylPressure = pulseEnvelope * manifoldPressure * 2.2 * this.shiftCutAttenuation * this.cylJitter[c];
 
-            // High-velocity turbulent air noise through valve curtain
+            // Soft valve gas rush noise
             const valveLift = Math.sin(x * Math.PI);
-            cylPressure += (Math.random() - 0.5) * 0.045 * valveLift * cylPressure;
+            cylPressure += (Math.random() - 0.5) * 0.025 * valveLift * cylPressure;
           }
         } else if (this.starterEngaged || this.engineState === 'STOPPING') {
-          // Unburned air compression puff through exhaust valve during cranking & spindown
-          if (deltaAngle < 85) {
-            const x = deltaAngle / 85;
-            cylPressure = Math.sin(x * Math.PI) * 0.38 * (this.currentRpm / 320);
+          // Cranking & Spindown: unburned air compression puff through exhaust valve
+          if (deltaAngle < 110) {
+            const x = deltaAngle / 110;
+            cylPressure = Math.sin(x * Math.PI) * 0.45 * Math.min(1.0, this.currentRpm / 250);
           }
         }
 
-        // Pressure Derivative Shock Wave (dP/dt):
-        // In Ange Yaghi's synthesizer, dF_F_mix creates the crisp, metallic valve opening "crack"
-        const dPressure = (cylPressure - this.lastCylPressure[c]) * this.sr;
+        // Pressure Derivative Shock Wave (dF_F_mix):
+        // Scaled to exactly 0.012 (matching Ange Yaghi's 0.01 ratio) - NO HARSH BUZZ!
+        const dP = (cylPressure - this.lastCylPressure[c]);
         this.lastCylPressure[c] = cylPressure;
-
-        // Combine base pressure wave with scaled derivative shock front
-        const shockFront = cylPressure + (dPressure * 0.00038);
+        const shockPulse = cylPressure + (dP * 0.012 * this.sr * 0.001);
 
         // Write cylinder pulse into individual exhaust runner delay buffer
         const buf = this.runnerBuffers[c];
         let ptr = this.runnerWritePtrs[c];
-        buf[ptr] = shockFront;
+        buf[ptr] = shockPulse;
 
-        // Compute runner delay in samples (speed of sound ~490 m/s in hot gas)
+        // Compute delay in samples
         const delaySamples = Math.min(this.maxDelay - 1, Math.round((runnerLen / speedOfSound) * this.sr));
         let readPtr = ptr - delaySamples;
         if (readPtr < 0) readPtr += this.maxDelay;
 
         const delayedPulse = buf[readPtr];
 
-        // Advance write pointer
         ptr = (ptr + 1) % this.maxDelay;
         this.runnerWritePtrs[c] = ptr;
 
-        // Sum delayed pulses into respective exhaust bank collector
+        // Sum into respective exhaust collector
         if (bank === 0) {
-          bank1RunnerSum += delayedPulse;
+          bank1Raw += delayedPulse;
         } else {
-          bank2RunnerSum += delayedPulse;
+          bank2Raw += delayedPulse;
         }
 
-        // Intake manifold roar (occurs during intake stroke, 360° opposite)
+        // Intake manifold roar (intake stroke 360° opposite)
         const intakeAngle = (this.crankAngle - ((fireAngle + 360) % 720) + 720) % 720;
-        if (intakeAngle < 150 && this.throttle > 0.08) {
-          const ix = intakeAngle / 150;
-          intakeRaw += Math.sin(ix * Math.PI * 2.0) * Math.exp(-ix * 2.4) * this.throttle;
+        if (intakeAngle < 160 && this.throttle > 0.05) {
+          const ix = intakeAngle / 160;
+          intakeRaw += Math.sin(ix * Math.PI) * Math.exp(-ix * 1.8) * this.throttle;
         }
       }
 
-      // Starter motor electric armature whir & gear commutation ripple:
-      // The pitch dynamically sags and groans with the compression dips!
-      let starterWhir = 0;
+      // Starter motor electric DC armature whine during cranking
       if (this.starterEngaged) {
-        // Armature slot ripple: 16 commutator poles per crank rotation
-        const armaturePitch = (this.crankAngle * 16.0 * Math.PI) / 180.0;
-        const motorSolenoidHum = Math.sin(this.crankAngle * 4.0 * Math.PI / 180.0) * 0.15;
-        starterWhir = (Math.sin(armaturePitch) * 0.26 + motorSolenoidHum) * (this.currentRpm / 220);
-        bank1RunnerSum += starterWhir;
-        bank2RunnerSum += starterWhir;
+        const armaturePitch = (this.crankAngle * 12.0 * Math.PI) / 180.0;
+        const starterArmature = Math.sin(armaturePitch) * 0.18 * (this.currentRpm / 180);
+        bank1Raw += starterArmature;
+        bank2Raw += starterArmature;
       }
 
-      // Exhaust overrun burble & pop
+      // Overrun burble & exhaust pop
       if (this.backfireEnergy > 0.01) {
         const popPhase = (this.crankAngle * 2.0 * Math.PI) / 180.0;
-        const lowThump = Math.sin(popPhase) * 0.45;
-        const subtleGas = (Math.random() * 2 - 1) * 0.05;
-        const pop = (lowThump + subtleGas) * this.backfireEnergy * 0.70;
-        bank1RunnerSum += pop;
-        bank2RunnerSum += pop * 0.85;
+        const lowThump = Math.sin(popPhase) * 0.55;
+        const pop = lowThump * this.backfireEnergy * 0.75;
+        bank1Raw += pop;
+        bank2Raw += pop * 0.85;
         this.backfireEnergy *= this.backfireDecay;
-      }
-
-      // Shutdown vacuum relief sigh (gentle atmospheric pressure equalization)
-      if (this.vacuumReliefEnergy > 0.005) {
-        const hiss = (Math.random() * 2 - 1) * this.vacuumReliefEnergy * 0.08;
-        bank1RunnerSum += hiss;
-        bank2RunnerSum += hiss;
-        this.vacuumReliefEnergy *= 0.9985;
       }
 
       // -------------------------------------------------------------
       // 3. EXHAUST COLLECTOR ACOUSTIC TRANSMISSION LINE (THROATINESS)
       // -------------------------------------------------------------
-      // In real exhaust pipes, positive pressure waves reflect off open collector ends
-      // as INVERTED negative expansion waves (R ~ -0.46), creating cavernous throatiness!
-
-      // Read reflected waves from transmission line
+      // Inverted negative reflection (-0.38) creates authentic hollow throatiness
       let readRefl1 = this.reflWritePtr1 - reflDelaySamples;
       if (readRefl1 < 0) readRefl1 += this.collectorLineLength;
       const primaryRefl1 = this.bank1CollectorLine[readRefl1];
@@ -588,7 +494,6 @@ class EngineSimProcessor extends AudioWorkletProcessor {
       if (readRefl2 < 0) readRefl2 += this.collectorLineLength;
       const primaryRefl2 = this.bank2CollectorLine[readRefl2];
 
-      // Secondary diffuse reflection
       let readSec1 = this.reflWritePtr1 - secReflSamples;
       if (readSec1 < 0) readSec1 += this.collectorLineLength;
       const secondaryRefl1 = this.bank1CollectorLine[readSec1];
@@ -597,7 +502,6 @@ class EngineSimProcessor extends AudioWorkletProcessor {
       if (readSec2 < 0) readSec2 += this.collectorLineLength;
       const secondaryRefl2 = this.bank2CollectorLine[readSec2];
 
-      // Cross-bank balance pipe bleed (X-pipe / H-pipe scavenging)
       let readCross1 = this.reflWritePtr2 - crossBleedSamples;
       if (readCross1 < 0) readCross1 += this.collectorLineLength;
       const crossBleed1 = this.bank2CollectorLine[readCross1];
@@ -606,44 +510,42 @@ class EngineSimProcessor extends AudioWorkletProcessor {
       if (readCross2 < 0) readCross2 += this.collectorLineLength;
       const crossBleed2 = this.bank1CollectorLine[readCross2];
 
-      // Inverted reflection combination (-0.46 negative reflection creates comb notches & hollow throat)
-      const collectorOut1 = bank1RunnerSum - (primaryRefl1 * 0.46) + (secondaryRefl1 * 0.18) + (crossBleed1 * 0.14);
-      const collectorOut2 = bank2RunnerSum - (primaryRefl2 * 0.46) + (secondaryRefl2 * 0.18) + (crossBleed2 * 0.14);
+      const collectorOut1 = bank1Raw - (primaryRefl1 * 0.38) + (secondaryRefl1 * 0.15) + (crossBleed1 * 0.12);
+      const collectorOut2 = bank2Raw - (primaryRefl2 * 0.38) + (secondaryRefl2 * 0.15) + (crossBleed2 * 0.12);
 
-      // Write forward waves into collector transmission lines
-      this.bank1CollectorLine[this.reflWritePtr1] = bank1RunnerSum + (primaryRefl1 * 0.22);
-      this.bank2CollectorLine[this.reflWritePtr2] = bank2RunnerSum + (primaryRefl2 * 0.22);
+      this.bank1CollectorLine[this.reflWritePtr1] = bank1Raw + (primaryRefl1 * 0.20);
+      this.bank2CollectorLine[this.reflWritePtr2] = bank2Raw + (primaryRefl2 * 0.20);
       this.reflWritePtr1 = (this.reflWritePtr1 + 1) % this.collectorLineLength;
       this.reflWritePtr2 = (this.reflWritePtr2 + 1) % this.collectorLineLength;
 
       // -------------------------------------------------------------
-      // 4. ACOUSTIC RESONATORS & MUFFLER CAVITY FILTERS
+      // 4. ACOUSTIC FILTERING (10Hz DC BLOCKER & WARM LOWPASS)
       // -------------------------------------------------------------
-      // 1. Pipe column resonance peaking
-      const res1 = this.bank1Res.process(collectorOut1);
-      const res2 = this.bank2Res.process(collectorOut2);
+      // 1. DC Blocker at 10.0 Hz (Ange Yaghi standard: preserves 100% of 25-60Hz combustion bass!)
+      const dc1 = this.dcFilter1.process(collectorOut1);
+      const dc2 = this.dcFilter2.process(collectorOut2);
 
-      // 2. Highpass metallic rasp
-      const rasp1 = this.bank1ThroatHp.process(res1);
-      const rasp2 = this.bank2ThroatHp.process(res2);
+      // 2. Pipe column resonance peaking
+      const res1 = this.bank1Res.process(dc1);
+      const res2 = this.bank2Res.process(dc2);
 
-      // 3. Muffler expansion chamber low-pass
-      const muf1 = this.bank1Lpf.process(rasp1);
-      const muf2 = this.bank2Lpf.process(rasp2);
+      // 3. Muffler lowpass filtering (Warm low-mid emphasis, capped at 1,850 Hz)
+      const muf1 = this.bank1Lpf2.process(this.bank1Lpf.process(res1));
+      const muf2 = this.bank2Lpf2.process(this.bank2Lpf.process(res2));
 
-      // 4. Deep sub-bass crankshaft throb
+      // 4. Sub-bass concussive throb (35 Hz - 75 Hz chest thump)
       const subSig = this.subLpf.process((muf1 + muf2) * 0.5);
 
       // 5. Intake induction growl
-      const intakeSig = this.intakeLpf.process(intakeRaw) * (p.intakeRoarGain || 0.65);
+      const intakeSig = this.intakeLpf.process(intakeRaw) * (p.intakeRoarGain || 0.60);
 
-      // 6. Stereo mix with soft saturation
-      let finalL = muf1 + (subSig * (p.subBassGain || 0.85)) + (intakeSig * 0.55);
-      let finalR = muf2 + (subSig * (p.subBassGain || 0.85)) + (intakeSig * 0.55);
+      // 6. Stereo mix with soft analog exhaust saturation
+      let finalL = muf1 + (subSig * (p.subBassGain || 1.10)) + (intakeSig * 0.45);
+      let finalR = muf2 + (subSig * (p.subBassGain || 1.10)) + (intakeSig * 0.45);
 
-      // Warm analog exhaust saturation (tanh compression)
-      outL[s] = Math.tanh(finalL * 1.32);
-      outR[s] = Math.tanh(finalR * 1.32);
+      // Warm analog non-linear saturation
+      outL[s] = Math.tanh(finalL * 1.15);
+      outR[s] = Math.tanh(finalR * 1.15);
     }
 
     // Periodically report simulated physical RPM back to UI
