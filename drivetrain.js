@@ -8,50 +8,22 @@ class RevverDrivetrain {
   constructor(audioEngine) {
     this.audio = audioEngine;
 
-    // Transmission setups tuned for realistic street & city driving
-    this.gearboxes = {
-      dct7: {
-        id: 'dct7',
-        name: '7-Speed PDK Dual-Clutch',
-        // 1st: 4.80, 2nd: 3.10, 3rd: 2.10, 4th: 1.55, 5th: 1.20, 6th: 0.95, 7th: 0.74
-        gears: [4.80, 3.10, 2.10, 1.55, 1.20, 0.95, 0.74],
-        finalDrive: 3.90,
-        shiftTimeMs: 75,
-        type: 'auto'
-      },
-      auto8: {
-        id: 'auto8',
-        name: '8-Speed PDK (992 Spec)',
-        // 1st: 4.90, 2nd: 3.20, 3rd: 2.20, 4th: 1.65, 5th: 1.30, 6th: 1.00, 7th: 0.82, 8th: 0.66
-        gears: [4.90, 3.20, 2.20, 1.65, 1.30, 1.00, 0.82, 0.66],
-        finalDrive: 3.90,
-        shiftTimeMs: 65,
-        type: 'auto'
-      },
-      manual6: {
-        id: 'manual6',
-        name: '6-Speed G50 Manual',
-        // 1st: 4.40, 2nd: 2.65, 3rd: 1.80, 4th: 1.30, 5th: 0.98, 6th: 0.76
-        gears: [4.40, 2.65, 1.80, 1.30, 0.98, 0.76],
-        finalDrive: 3.90,
-        shiftTimeMs: 200,
-        type: 'manual'
-      },
-      seq6: {
-        id: 'seq6',
-        name: '6-Speed Sequential GT3 Cup',
-        gears: [3.80, 2.45, 1.75, 1.35, 1.08, 0.88],
-        finalDrive: 3.90,
-        shiftTimeMs: 50,
-        type: 'sequential'
-      }
+    // Standard 6-Speed Porsche Transmission (Authentic 911 / Cayman GT ratios)
+    this.gearbox = {
+      id: 'manual6',
+      name: '6-Speed Porsche Transmission',
+      gears: [3.82, 2.26, 1.64, 1.29, 1.06, 0.88],
+      finalDrive: 3.89,
+      shiftTimeMs: 70,
+      type: 'sport'
     };
-
-    this.activeGearbox = this.gearboxes.dct7;
+    this.gearboxes = { manual6: this.gearbox, dct7: this.gearbox, auto8: this.gearbox, seq6: this.gearbox };
+    this.activeGearbox = this.gearbox;
     this.isManualMode = false;
 
-    // Shift map / Drive Mode: 'city' (Daily/Comfort - default), 'sport', 'track'
-    this.driveMode = 'city';
+    // Sport Mode Shift Curve Aggression Slider (0.0 = low-RPM cruising to 1.0 = screams to redline)
+    this.sportModeAggression = 0.60;
+    this.driveMode = 'sport';
     this.lastShiftTime = 0;
     this.shiftCooldownMs = 600; // Minimum interval between shifts
 
@@ -137,7 +109,22 @@ class RevverDrivetrain {
     }
   }
 
+  setSportModeAggression(val) {
+    this.sportModeAggression = Math.max(0, Math.min(1, val));
+    if (this.sportModeAggression < 0.35) {
+      this.driveMode = 'city';
+    } else if (this.sportModeAggression < 0.75) {
+      this.driveMode = 'sport';
+    } else {
+      this.driveMode = 'track';
+    }
+    return this.sportModeAggression;
+  }
+
   setDriveMode(mode) {
+    if (mode === 'city') this.setSportModeAggression(0.20);
+    else if (mode === 'sport') this.setSportModeAggression(0.60);
+    else if (mode === 'track') this.setSportModeAggression(1.00);
     if (['city', 'sport', 'track'].includes(mode)) {
       this.driveMode = mode;
       return true;
@@ -351,31 +338,15 @@ class RevverDrivetrain {
     const numGears = this.activeGearbox.gears.length;
     const speedMph = this.speedMph;
 
-    // 1. DYNAMIC UPSHIFT TARGET CURVE BASED ON DRIVE MODE & THROTTLE LOAD
-    let minUpshiftRpm;
-    let maxUpshiftRpm;
-    let downshiftFloorRpm;
+    // 1. DYNAMIC UPSHIFT TARGET CURVE GOVERNED BY SPORT MODE SLIDER (0.0 to 1.0)
+    // At aggression = 0.0 (Comfort / Cruise): min shift ~2,000 RPM, max shift ~3,600 RPM
+    // At aggression = 0.5 (Sport): min shift ~3,400 RPM, max shift ~6,200 RPM
+    // At aggression = 1.0 (Track / Redline): min shift ~5,000 RPM, max shift ~98% of Redline (~8,800 RPM)
+    const aggression = this.sportModeAggression;
+    const minUpshiftRpm = 2000 + (aggression * (this.redlineRpm * 0.55 - 2000));
+    const maxUpshiftRpm = (this.idleRpm + 2600) + (aggression * (this.redlineRpm * 0.98 - (this.idleRpm + 2600)));
+    const downshiftFloorRpm = 1300 + (aggression * (this.redlineRpm * 0.44 - 1300));
 
-    if (this.driveMode === 'track') {
-      // Track / Race Mode: Keeps revs screaming between 4,500 and 8,800 RPM!
-      minUpshiftRpm = Math.max(4800, this.redlineRpm * 0.62);
-      maxUpshiftRpm = this.redlineRpm * 0.96; // Shifts at ~8,640 RPM on 9,000 redline!
-      downshiftFloorRpm = Math.max(3800, this.redlineRpm * 0.48);
-    } else if (this.driveMode === 'sport') {
-      // Sport Mode: Energetic powerband between 3,200 and 8,200 RPM
-      minUpshiftRpm = Math.max(3200, this.redlineRpm * 0.40);
-      maxUpshiftRpm = this.redlineRpm * 0.92; // Shifts at ~8,280 RPM on 9,000 redline!
-      downshiftFloorRpm = Math.max(2400, this.redlineRpm * 0.30);
-    } else {
-      // City / Street Mode:
-      // Light throttle (< 25%): shifts early (2,300 - 2,800 RPM) for quiet around-town driving
-      // Heavy throttle (> 70%): revs freely to 7,500 - 8,200 RPM!
-      minUpshiftRpm = Math.max(2200, this.idleRpm + 1350);
-      maxUpshiftRpm = this.redlineRpm * 0.88; // Revs up to 7,920 RPM on 9,000 redline!
-      downshiftFloorRpm = Math.max(1400, this.idleRpm + 550);
-    }
-
-    // Non-linear throttle pedal progression
     const throttleFactor = Math.pow(Math.max(0, this.throttle), 1.25);
     const targetUpshiftRpm = minUpshiftRpm + (throttleFactor * (maxUpshiftRpm - minUpshiftRpm));
 

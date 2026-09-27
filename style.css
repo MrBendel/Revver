@@ -1924,3 +1924,269 @@ input[type="range"]::-webkit-slider-thumb {
     grid-column: span 2;
   }
 }
+
+/* ==========================================================================
+   SIMPLIFIED COCKPIT UX: ENGINE DROPDOWN, 6-SPEED TRANSMISSION & PEDAL BUTTONS
+   ========================================================================== */
+
+/* Engine Dropdown Card */
+.engine-dropdown-card {
+  background: linear-gradient(180deg, #181b24 0%, #12141a 100%);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+.dropdown-label {
+  font-family: var(--font-condensed);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #8c94a6;
+  text-transform: uppercase;
+}
+
+.select-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.porsche-select {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  background: #0d0f14;
+  border: 1px solid rgba(196, 161, 89, 0.35);
+  border-radius: var(--radius-sm);
+  color: #ffffff;
+  font-family: var(--font-condensed);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23c4a159' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+}
+
+.porsche-select:focus,
+.porsche-select:hover {
+  border-color: var(--porsche-gold);
+  box-shadow: 0 0 10px rgba(196, 161, 89, 0.25);
+  background-color: #11141b;
+}
+
+.porsche-select option {
+  background: #141720;
+  color: #ffffff;
+  padding: 0.5rem;
+}
+
+.engine-spec-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.spec-chip {
+  padding: 0.18rem 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  color: var(--porsche-gold);
+  letter-spacing: 0.03em;
+}
+
+/* 6-Speed Transmission & Sport Mode Slider Card */
+.transmission-card {
+  background: linear-gradient(180deg, #181b24 0%, #12141a 100%);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+.tx-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tx-name {
+  font-family: var(--font-condensed);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+}
+
+.tx-status-badge {
+  font-family: var(--font-condensed);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 0.12rem 0.45rem;
+  background: rgba(213, 0, 28, 0.15);
+  border: 1px solid var(--porsche-red);
+  color: var(--porsche-red);
+  border-radius: 2px;
+}
+
+.sport-curve-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.slider-ticks-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: #7b8394;
+  margin-top: 0.2rem;
+}
+
+/* Driver Controls Card (Button-based Gas & Brake) */
+.driver-controls-card {
+  background: linear-gradient(180deg, #181b24 0%, #111319 100%);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.pedals-flex-row {
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  gap: 0.65rem;
+  height: 125px;
+}
+
+.driver-pedal-btn {
+  position: relative;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  transition: transform 0.06s ease, box-shadow 0.08s ease, background 0.12s ease;
+  overflow: hidden;
+}
+
+/* Brake Pedal */
+.driver-pedal-btn.brake-pedal {
+  background: linear-gradient(180deg, #242833 0%, #171922 100%);
+  border-color: rgba(213, 0, 28, 0.35);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.15), 0 4px 8px rgba(0, 0, 0, 0.6);
+}
+
+.driver-pedal-btn.brake-pedal:hover {
+  background: linear-gradient(180deg, #2c3240 0%, #1d202b 100%);
+  border-color: var(--porsche-red);
+}
+
+.driver-pedal-btn.brake-pedal:active,
+.driver-pedal-btn.brake-pedal.pressed {
+  transform: translateY(4px);
+  background: linear-gradient(180deg, #9b0014 0%, #61000d 100%);
+  border-color: #ff334b;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.8), 0 0 14px rgba(213, 0, 28, 0.5);
+}
+
+/* Gas Pedal (Taller, Aluminum-accented with rubber ribs) */
+.driver-pedal-btn.gas-pedal {
+  background: linear-gradient(180deg, #323847 0%, #1c202a 100%);
+  border-color: rgba(196, 161, 89, 0.45);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.3), 0 6px 12px rgba(0, 0, 0, 0.65);
+}
+
+.pedal-metal-grooves {
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 12px;
+  width: 8px;
+  background: repeating-linear-gradient(
+    180deg,
+    #0c0e13 0px,
+    #0c0e13 4px,
+    transparent 4px,
+    transparent 8px
+  );
+  border-radius: 2px;
+  opacity: 0.7;
+}
+
+.driver-pedal-btn.gas-pedal:hover {
+  background: linear-gradient(180deg, #3c4456 0%, #242936 100%);
+  border-color: var(--porsche-gold);
+}
+
+.driver-pedal-btn.gas-pedal:active,
+.driver-pedal-btn.gas-pedal.pressed {
+  transform: translateY(5px);
+  background: linear-gradient(180deg, #d5001c 0%, #870012 100%);
+  border-color: #ff475e;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.8), 0 0 18px rgba(213, 0, 28, 0.6);
+}
+
+.pedal-sub {
+  font-family: var(--font-condensed);
+  font-size: 0.60rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #8f98ab;
+  text-transform: uppercase;
+}
+
+.driver-pedal-btn.pressed .pedal-sub,
+.driver-pedal-btn:active .pedal-sub {
+  color: #ffccd3;
+}
+
+.pedal-main-text {
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #ffffff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+}
+
+.pedal-key-hint {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 600;
+  color: var(--porsche-gold);
+  letter-spacing: 0.04em;
+}
+
+.driver-pedal-btn.pressed .pedal-key-hint,
+.driver-pedal-btn:active .pedal-key-hint {
+  color: #ffffff;
+}
+

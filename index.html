@@ -83,56 +83,54 @@
       <!-- LEFT: Car / Engine Sound Models Selector -->
       <aside class="sidebar-panel">
         <div class="panel-section-title">
-          <span>STUTTGART ROSTER</span>
-          <span class="badge" id="engine-count-badge">6 MODELS</span>
+          <span>POWERTRAIN MODEL</span>
+          <span class="badge" id="engine-count-badge">6 ENGINES</span>
         </div>
 
-        <div class="engine-cards-list" id="engine-selector-container">
-          <!-- Engine items populated dynamically via JS -->
+        <div class="engine-dropdown-card">
+          <label for="engine-select" class="dropdown-label">ACTIVE ENGINE</label>
+          <div class="select-wrapper">
+            <select id="engine-select" class="porsche-select">
+              <option value="flat6" selected>Stuttgart 4.0L High-Rev Flat-6 (9,000 RPM)</option>
+              <option value="aircooled993">Classic 993 RS 3.8L Flat-6 (7,800 RPM)</option>
+              <option value="v8muscle">Shelby Beast 5.2L V8 (7,500 RPM)</option>
+              <option value="v10f1">Carrera GT 5.7L V10 (8,500 RPM)</option>
+              <option value="turboV6">Stuttgart 3.7L Twin-Turbo Flat-6 (7,400 RPM)</option>
+              <option value="groupB5">Group B 2.2L Turbo Inline-5 (8,300 RPM)</option>
+            </select>
+          </div>
+          <div class="engine-spec-preview" id="engine-spec-preview">
+            <span class="spec-chip" id="chip-cylinders">6-Cyl Boxer</span>
+            <span class="spec-chip" id="chip-redline">9,000 RPM Redline</span>
+            <span class="spec-chip" id="chip-aspiration">Naturally Aspirated</span>
+          </div>
         </div>
 
-        <!-- Transmission Controls -->
-        <div class="panel-section-title" style="margin-top: 1.35rem;">
-          <span>PORSCHE TRANSMISSION</span>
+        <!-- Transmission & Sport Mode Redline Shift Curve Slider -->
+        <div class="panel-section-title" style="margin-top: 1.25rem;">
+          <span>TRANSMISSION</span>
+          <span class="badge highlight">6-SPEED</span>
         </div>
-        <div class="gearbox-selector">
-          <button class="gearbox-btn active" data-gearbox="dct7">
-            <span class="gb-name">7-Speed PDK Dual-Clutch</span>
-            <span class="gb-desc">Porsche Doppelkupplung / 75ms shift cut</span>
-          </button>
-          <button class="gearbox-btn" data-gearbox="auto8">
-            <span class="gb-name">8-Speed PDK (992 Spec)</span>
-            <span class="gb-desc">Ultra-fast dual clutch / Launch control</span>
-          </button>
-          <button class="gearbox-btn" data-gearbox="manual6">
-            <span class="gb-name">6-Speed G50 Manual</span>
-            <span class="gb-desc">Classic mechanical gate feel & rev-match</span>
-          </button>
-          <button class="gearbox-btn" data-gearbox="seq6">
-            <span class="gb-name">6-Speed Sequential GT3 Cup</span>
-            <span class="gb-desc">Straight-cut dog ring whine</span>
-          </button>
+        <div class="transmission-card">
+          <div class="tx-info-row">
+            <span class="tx-name">6-Speed Porsche Transmission</span>
+            <span class="tx-status-badge" id="transmission-status-badge">SPORT</span>
+          </div>
+          <div class="sport-curve-box">
+            <div class="tuning-row">
+              <label for="sport-mode-slider">
+                <span>Sport Mode (Redline Curve)</span>
+                <span id="sport-curve-val" class="tuning-val">Sport (60%)</span>
+              </label>
+              <input type="range" id="sport-mode-slider" min="0" max="100" value="60" class="porsche-slider">
+              <div class="slider-ticks-row">
+                <span>Comfort (2.5k)</span>
+                <span>Sport (5.5k)</span>
+                <span>Redline (9k)</span>
+              </div>
+            </div>
+          </div>
         </div>
-
-        <!-- Shift Map / Drive Mode Controls -->
-        <div class="panel-section-title" style="margin-top: 1.15rem;">
-          <span>SPORT CHRONO DRIVE MODE</span>
-        </div>
-        <div class="drive-mode-selector">
-          <button class="drive-mode-btn active" data-mode="city">
-            <span class="dm-name">Normal / Touring</span>
-            <span class="dm-desc">Gentle shifts @ ~2,200 RPM • Efficient cruise</span>
-          </button>
-          <button class="drive-mode-btn" data-mode="sport">
-            <span class="dm-name">Sport Dynamic</span>
-            <span class="dm-desc">Holds gears to 6,000+ RPM • Dynamic kickdown & rev blips</span>
-          </button>
-          <button class="drive-mode-btn" data-mode="track">
-            <span class="dm-name">Sport Plus / Track</span>
-            <span class="dm-desc">True racing engine howl • Redline shifts @ 8,500+ RPM</span>
-          </button>
-        </div>
-
         <!-- Sound Tuning Controls -->
         <div class="sound-tuning-box">
           <div class="tuning-row">
@@ -364,26 +362,22 @@
 
         <!-- SUBPANEL 1: Virtual Driving Rig (Pedals, Drag Launch, Automated Scenarios) -->
         <div class="tab-content active" id="content-simulation">
-          <div class="virtual-pedal-card">
+          <div class="driver-controls-card">
             <div class="pedal-header">
-              <span>INTERACTIVE THROTTLE PEDAL</span>
-              <span class="pedal-hint">Drag or Hold [W] / [↑]</span>
+              <span>DRIVER PEDALS</span>
+              <span class="pedal-hint">Key [W] or Click & Hold</span>
             </div>
-            <div class="pedal-slider-container">
-              <input type="range" id="sim-pedal-slider" min="0" max="100" value="0" orient="vertical">
-              <div class="pedal-travel-visual">
-                <div class="pedal-face" id="pedal-face-plate">
-                  <div class="pedal-grooves"></div>
-                  <span class="pedal-text">GAS</span>
-                </div>
-              </div>
-            </div>
-            <div class="pedal-actions">
-              <button class="pedal-btn brake-btn" id="sim-brake-btn">
-                <span>BRAKE [S]</span>
+            <div class="pedals-flex-row">
+              <button class="driver-pedal-btn brake-pedal" id="sim-brake-btn" title="Hold [S] or Click to Brake">
+                <span class="pedal-sub">HOLD TO BRAKE</span>
+                <span class="pedal-main-text">BRAKE</span>
+                <span class="pedal-key-hint">[S] / [↓]</span>
               </button>
-              <button class="pedal-btn gas-btn" id="sim-gas-btn">
-                <span>FULL GAS [W]</span>
+              <button class="driver-pedal-btn gas-pedal" id="sim-gas-btn" title="Hold [W] or Click to Accelerate">
+                <div class="pedal-metal-grooves"></div>
+                <span class="pedal-sub">HOLD TO ACCELERATE</span>
+                <span class="pedal-main-text">GAS</span>
+                <span class="pedal-key-hint">[W] / [↑] / [SPACE]</span>
               </button>
             </div>
           </div>

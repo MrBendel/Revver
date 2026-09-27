@@ -104,6 +104,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const gpsStatusText = document.getElementById('gps-status-text');
 
   // Sidebar Controls
+  const engineSelect = document.getElementById('engine-select');
+  const chipCylinders = document.getElementById('chip-cylinders');
+  const chipRedline = document.getElementById('chip-redline');
+  const chipAspiration = document.getElementById('chip-aspiration');
+  const engineCountBadge = document.getElementById('engine-count-badge');
+  const sportModeSlider = document.getElementById('sport-mode-slider');
+  const sportCurveVal = document.getElementById('sport-curve-val');
   const engineSelectorContainer = document.getElementById('engine-selector-container');
   const gearboxBtns = document.querySelectorAll('.gearbox-btn');
   const driveModeBtns = document.querySelectorAll('.drive-mode-btn');
@@ -183,32 +190,63 @@ document.addEventListener('DOMContentLoaded', () => {
      1. Populate Engine Models List
      ------------------------------------------------------------- */
   function renderEngineList() {
-    engineSelectorContainer.innerHTML = '';
-    Object.values(audio.profiles).forEach(p => {
-      const card = document.createElement('div');
-      card.className = `engine-card ${p.id === audio.activeProfile.id ? 'active' : ''}`;
-      card.dataset.id = p.id;
-      card.innerHTML = `
-        <div class="engine-card-left">
-          <span class="engine-card-name">${p.name}</span>
-          <span class="engine-card-spec">${p.cylinders} Cyl • ${p.redlineRpm.toLocaleString()} RPM Redline</span>
-        </div>
-        <span class="engine-card-tag">${p.turbo ? 'TURBO' : 'N/A'}</span>
-      `;
-
-      card.addEventListener('click', () => {
-        document.querySelectorAll('.engine-card').forEach(c => c.classList.remove('active'));
-        card.classList.add('active');
-        audio.applyProfile(p);
-        drivetrain.setEngineLimits(p.idleRpm, p.redlineRpm);
-        updateHudEngineInfo(p);
+    if (engineSelect) {
+      engineSelect.innerHTML = '';
+      Object.values(audio.profiles).forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = `${p.name} (${p.redlineRpm.toLocaleString()} RPM)`;
+        if (p.id === audio.activeProfile.id) opt.selected = true;
+        engineSelect.appendChild(opt);
       });
 
-      engineSelectorContainer.appendChild(card);
-    });
+      engineSelect.onchange = () => {
+        const p = audio.profiles[engineSelect.value];
+        if (p) {
+          audio.applyProfile(p);
+          drivetrain.setEngineLimits(p.idleRpm, p.redlineRpm);
+          updateEngineChips(p);
+          updateHudEngineInfo(p);
+        }
+      };
+      updateEngineChips(audio.activeProfile);
+    }
+
+    if (engineSelectorContainer) {
+      engineSelectorContainer.innerHTML = '';
+      Object.values(audio.profiles).forEach(p => {
+        const card = document.createElement('div');
+        card.className = `engine-card ${p.id === audio.activeProfile.id ? 'active' : ''}`;
+        card.dataset.id = p.id;
+        card.innerHTML = `
+          <div class="engine-card-left">
+            <span class="engine-card-name">${p.name}</span>
+            <span class="engine-card-spec">${p.cylinders} Cyl • ${p.redlineRpm.toLocaleString()} RPM Redline</span>
+          </div>
+          <span class="engine-card-tag">${p.turbo ? 'TURBO' : 'N/A'}</span>
+        `;
+        card.addEventListener('click', () => {
+          document.querySelectorAll('.engine-card').forEach(c => c.classList.remove('active'));
+          card.classList.add('active');
+          audio.applyProfile(p);
+          drivetrain.setEngineLimits(p.idleRpm, p.redlineRpm);
+          if (engineSelect) engineSelect.value = p.id;
+          updateEngineChips(p);
+          updateHudEngineInfo(p);
+        });
+        engineSelectorContainer.appendChild(card);
+      });
+    }
 
     drivetrain.setEngineLimits(audio.activeProfile.idleRpm, audio.activeProfile.redlineRpm);
     updateHudEngineInfo(audio.activeProfile);
+  }
+
+  function updateEngineChips(p) {
+    if (chipCylinders) chipCylinders.textContent = `${p.cylinders}-Cyl ${p.cylinders === 6 ? 'Boxer' : (p.cylinders === 8 ? 'V8' : (p.cylinders === 10 ? 'V10' : 'Inline-5'))}`;
+    if (chipRedline) chipRedline.textContent = `${p.redlineRpm.toLocaleString()} RPM Redline`;
+    if (chipAspiration) chipAspiration.textContent = p.turbo ? 'Twin-Turbocharged' : 'Naturally Aspirated';
+    if (engineCountBadge) engineCountBadge.textContent = `${p.cylinders} CYL`;
   }
 
   function updateHudEngineInfo(p) {
@@ -282,75 +320,116 @@ document.addEventListener('DOMContentLoaded', () => {
   startEngineBtn.addEventListener('click', toggleEngine);
 
   /* -------------------------------------------------------------
-     3. Gearbox & Drive Mode Selection
+     3. Transmission & Sport Mode Redline Shift Curve
      ------------------------------------------------------------- */
-  gearboxBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      gearboxBtns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      const gbId = btn.dataset.gearbox;
-      drivetrain.setGearbox(gbId);
-      hudModalTransmissionText.textContent = drivetrain.activeGearbox.name.toUpperCase();
-    });
-  });
-
-  driveModeBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      driveModeBtns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      const mode = btn.dataset.mode;
-      drivetrain.setDriveMode(mode);
+  if (sportModeSlider) {
+    sportModeSlider.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value) / 100;
+      drivetrain.setSportModeAggression(val);
+      let label = 'Sport (60%)';
+      if (val < 0.35) {
+        label = `Comfort (${Math.round(val * 100)}%)`;
+      } else if (val < 0.75) {
+        label = `Sport Dynamic (${Math.round(val * 100)}%)`;
+      } else {
+        label = `Redline Screamer (${Math.round(val * 100)}%)`;
+      }
+      if (sportCurveVal) sportCurveVal.textContent = label;
       updateShiftModeLabel();
     });
-  });
+  }
+
+  if (gearboxBtns) {
+    gearboxBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        gearboxBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const gbId = btn.dataset.gearbox;
+        drivetrain.setGearbox(gbId);
+        if (hudModalTransmissionText) hudModalTransmissionText.textContent = drivetrain.activeGearbox.name.toUpperCase();
+      });
+    });
+  }
+
+  if (driveModeBtns) {
+    driveModeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        driveModeBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const mode = btn.dataset.mode;
+        drivetrain.setDriveMode(mode);
+        if (sportModeSlider) sportModeSlider.value = Math.round(drivetrain.sportModeAggression * 100);
+        updateShiftModeLabel();
+      });
+    });
+  }
 
   function updateShiftModeLabel() {
     if (drivetrain.isManualMode) {
-      if (hudShiftMode) hudShiftMode.textContent = 'MANUAL';
-      if (shifterModeIndicator) shifterModeIndicator.textContent = 'MANUAL PADDLES';
+      if (hudShiftMode) hudShiftMode.textContent = 'MANUAL 6-SPEED';
+      if (shifterModeIndicator) shifterModeIndicator.textContent = 'MANUAL PADDLES (6-SPD)';
     } else {
-      const modeName = (drivetrain.driveMode || 'city').toUpperCase();
-      if (hudShiftMode) hudShiftMode.textContent = `AUTO • ${modeName}`;
-      if (shifterModeIndicator) shifterModeIndicator.textContent = `AUTO (${modeName})`;
+      const pct = Math.round(drivetrain.sportModeAggression * 100);
+      let modeStr = 'SPORT';
+      if (pct < 35) modeStr = 'COMFORT';
+      else if (pct >= 75) modeStr = 'REDLINE';
+      if (hudShiftMode) hudShiftMode.textContent = `PDK 6-SPD • ${modeStr} (${pct}%)`;
+      if (shifterModeIndicator) shifterModeIndicator.textContent = `AUTO 6-SPD (${modeStr})`;
     }
   }
 
   /* -------------------------------------------------------------
      4. Sound Tuning Sliders
      ------------------------------------------------------------- */
-  masterVolumeSlider.addEventListener('input', (e) => {
-    const val = parseInt(e.target.value);
-    document.getElementById('volume-val').textContent = `${val}%`;
-    audio.setMasterVolume(val / 100);
-  });
+  if (masterVolumeSlider) {
+    masterVolumeSlider.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value);
+      const el = document.getElementById('volume-val');
+      if (el) el.textContent = `${val}%`;
+      audio.setMasterVolume(val / 100);
+    });
+  }
 
-  bassBoostSlider.addEventListener('input', (e) => {
-    const val = parseInt(e.target.value);
-    document.getElementById('bass-val').textContent = val > 100 ? 'Extreme Thump' : val > 60 ? `Thumping (${val}%)` : `Subtle (${val}%)`;
-    audio.setBassBoost(val / 100);
-  });
+  if (bassBoostSlider) {
+    bassBoostSlider.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value);
+      const el = document.getElementById('bass-val');
+      if (el) el.textContent = val > 100 ? 'Extreme Thump' : val > 60 ? `Thumping (${val}%)` : `Subtle (${val}%)`;
+      audio.setBassBoost(val / 100);
+    });
+  }
 
-  pitchScaleSlider.addEventListener('input', (e) => {
-    const val = parseInt(e.target.value) / 100;
-    document.getElementById('pitch-val').textContent = val < 0.8 ? `Ultra Deep (${val.toFixed(2)}x)` : val <= 1.0 ? `Deep (${val.toFixed(2)}x)` : `Higher (${val.toFixed(2)}x)`;
-    audio.activeProfile.sampleRpm = (audio.activeProfile.sampleRpm || 3200) * (1 / val);
-    audio.activeProfile.pitchScale = 0.50 * val;
-  });
+  if (pitchScaleSlider) {
+    pitchScaleSlider.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value) / 100;
+      const el = document.getElementById('pitch-val');
+      if (el) el.textContent = val < 0.8 ? `Ultra Deep (${val.toFixed(2)}x)` : val <= 1.0 ? `Deep (${val.toFixed(2)}x)` : `Higher (${val.toFixed(2)}x)`;
+      audio.activeProfile.sampleRpm = (audio.activeProfile.sampleRpm || 3200) * (1 / val);
+      audio.activeProfile.pitchScale = 0.50 * val;
+    });
+  }
 
-  exhaustPopsSlider.addEventListener('input', (e) => {
-    const val = parseInt(e.target.value);
-    document.getElementById('pops-val').textContent = val > 65 ? 'High' : val > 30 ? 'Medium' : 'Subtle';
-    audio.tuning.exhaustPops = val;
-  });
+  if (exhaustPopsSlider) {
+    exhaustPopsSlider.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value);
+      const el = document.getElementById('pops-val');
+      if (el) el.textContent = val > 65 ? 'High' : val > 30 ? 'Medium' : 'Subtle';
+      audio.tuning.exhaustPops = val;
+    });
+  }
 
-  turboSpoolSlider.addEventListener('input', (e) => {
-    const val = parseInt(e.target.value);
-    document.getElementById('turbo-val').textContent = `${val}%`;
-    audio.tuning.turboSpool = val / 100;
-  });
+  if (turboSpoolSlider) {
+    turboSpoolSlider.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value);
+      const el = document.getElementById('turbo-val');
+      if (el) el.textContent = `${val}%`;
+      audio.tuning.turboSpool = val / 100;
+    });
+  }
 
   // Custom Game WAV loader (TORCS / Speed Dreams / Assetto Corsa format)
-  customWavInput.addEventListener('change', async (e) => {
+  if (customWavInput) {
+    customWavInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -364,6 +443,7 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('Could not decode audio file. Please ensure it is a valid .wav or .ogg loop.');
     }
   });
+  }
 
   // Tire Acoustics Controls Event Listeners
   if (tireAudioToggle) {
@@ -481,56 +561,74 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  enableSensorsBtn.addEventListener('click', async () => {
-    await sensors.requestSensors();
-    sensorDot.className = 'status-dot active';
-    sensorStatusText.textContent = 'IMU: Connected (60Hz)';
-    gpsDot.className = 'status-dot active';
-    gpsStatusText.textContent = 'GPS: Active';
-    enableSensorsBtn.innerHTML = `<span>✓ SENSORS CONNECTED</span>`;
-  });
+  if (enableSensorsBtn) {
+    enableSensorsBtn.addEventListener('click', async () => {
+      await sensors.requestSensors();
+      if (sensorDot) sensorDot.className = 'status-dot active';
+      if (sensorStatusText) sensorStatusText.textContent = 'IMU: Connected (60Hz)';
+      if (gpsDot) gpsDot.className = 'status-dot active';
+      if (gpsStatusText) gpsStatusText.textContent = 'GPS: Active';
+      enableSensorsBtn.innerHTML = `<span>✓ SENSORS CONNECTED</span>`;
+    });
+  }
 
-  calibrateMountBtn.addEventListener('click', () => {
-    const cal = sensors.calibrateMountOrientation();
-    alert(`Mount orientation calibrated!\nGravity offsets: X=${cal.x}, Y=${cal.y}, Z=${cal.z}\nReady for drive acceleration.`);
-  });
+  if (calibrateMountBtn) {
+    calibrateMountBtn.addEventListener('click', () => {
+      const cal = sensors.calibrateMountOrientation();
+      alert(`Mount orientation calibrated!\nGravity offsets: X=${cal.x}, Y=${cal.y}, Z=${cal.z}\nReady for drive acceleration.`);
+    });
+  }
 
-  accelSensitivity.addEventListener('input', (e) => {
-    const factor = parseInt(e.target.value) / 100;
-    sensors.sensitivity = factor;
-    document.getElementById('sens-val').textContent = `${factor.toFixed(1)}x`;
-  });
+  if (accelSensitivity) {
+    accelSensitivity.addEventListener('input', (e) => {
+      const factor = parseInt(e.target.value) / 100;
+      sensors.sensitivity = factor;
+      const el = document.getElementById('sens-val');
+      if (el) el.textContent = `${factor.toFixed(1)}x`;
+    });
+  }
 
-  regenBrakeThreshold.addEventListener('input', (e) => {
-    const g = -parseInt(e.target.value) / 100;
-    sensors.regenThresholdG = g;
-    document.getElementById('regen-val').textContent = `${g.toFixed(2)} G`;
-  });
+  if (regenBrakeThreshold) {
+    regenBrakeThreshold.addEventListener('input', (e) => {
+      const g = -parseInt(e.target.value) / 100;
+      sensors.regenThresholdG = g;
+      const el = document.getElementById('regen-val');
+      if (el) el.textContent = `${g.toFixed(2)} G`;
+    });
+  }
 
   /* -------------------------------------------------------------
      6. Driving Inputs: Virtual Pedal & Keyboard
      ------------------------------------------------------------- */
-  simPedalSlider.addEventListener('input', (e) => {
-    const val = parseInt(e.target.value);
-    updatePedalPosition(val);
-  });
+  if (simPedalSlider) {
+    simPedalSlider.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value);
+      updatePedalPosition(val);
+    });
+  }
 
   function updatePedalPosition(pct) {
-    simPedalSlider.value = pct;
-    pedalFacePlate.style.transform = `translateY(${-pct * 0.75}px)`;
+    if (simPedalSlider) simPedalSlider.value = pct;
+    if (pedalFacePlate) pedalFacePlate.style.transform = `translateY(${-pct * 0.75}px)`;
+    if (simGasBtn) {
+      if (pct > 5) simGasBtn.classList.add('pressed');
+      else simGasBtn.classList.remove('pressed');
+    }
   }
 
   // Keyboard W/S or Arrow Up/Down
   window.addEventListener('keydown', (e) => {
     if (e.repeat) return;
-    if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') {
+    if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp' || e.key === ' ') {
       keys.gas = true;
       currentScenario = null;
+      if (simGasBtn) simGasBtn.classList.add('pressed');
       if (!isEngineRunning) toggleEngine();
     }
     if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') {
       keys.brake = true;
       currentScenario = null;
+      if (simBrakeBtn) simBrakeBtn.classList.add('pressed');
     }
     if (e.key === 'a' || e.key === 'A') {
       keys.steerLeft = true;
@@ -557,11 +655,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   window.addEventListener('keyup', (e) => {
-    if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') {
+    if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp' || e.key === ' ') {
       keys.gas = false;
+      if (simGasBtn) simGasBtn.classList.remove('pressed');
     }
     if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') {
       keys.brake = false;
+      if (simBrakeBtn) simBrakeBtn.classList.remove('pressed');
     }
     if (e.key === 'a' || e.key === 'A') {
       keys.steerLeft = false;
@@ -575,33 +675,70 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Buttons for gas / brake
-  simGasBtn.addEventListener('mousedown', () => { keys.gas = true; if (!isEngineRunning) toggleEngine(); });
-  simGasBtn.addEventListener('mouseup', () => { keys.gas = false; });
-  simGasBtn.addEventListener('mouseleave', () => { keys.gas = false; });
+  // Driver Controls: Tactile Gas Pedal Button & Brake Button
+  if (simGasBtn) {
+    const pressGas = (e) => {
+      if (e && e.cancelable) e.preventDefault();
+      keys.gas = true;
+      simGasBtn.classList.add('pressed');
+      if (!isEngineRunning) toggleEngine();
+    };
+    const releaseGas = (e) => {
+      if (e && e.cancelable) e.preventDefault();
+      keys.gas = false;
+      simGasBtn.classList.remove('pressed');
+    };
 
-  simBrakeBtn.addEventListener('mousedown', () => { keys.brake = true; });
-  simBrakeBtn.addEventListener('mouseup', () => { keys.brake = false; });
-  simBrakeBtn.addEventListener('mouseleave', () => { keys.brake = false; });
+    simGasBtn.addEventListener('mousedown', pressGas);
+    simGasBtn.addEventListener('mouseup', releaseGas);
+    simGasBtn.addEventListener('mouseleave', releaseGas);
+    simGasBtn.addEventListener('touchstart', pressGas, { passive: false });
+    simGasBtn.addEventListener('touchend', releaseGas, { passive: false });
+    simGasBtn.addEventListener('touchcancel', releaseGas);
+  }
+
+  if (simBrakeBtn) {
+    const pressBrake = (e) => {
+      if (e && e.cancelable) e.preventDefault();
+      keys.brake = true;
+      simBrakeBtn.classList.add('pressed');
+    };
+    const releaseBrake = (e) => {
+      if (e && e.cancelable) e.preventDefault();
+      keys.brake = false;
+      simBrakeBtn.classList.remove('pressed');
+    };
+
+    simBrakeBtn.addEventListener('mousedown', pressBrake);
+    simBrakeBtn.addEventListener('mouseup', releaseBrake);
+    simBrakeBtn.addEventListener('mouseleave', releaseBrake);
+    simBrakeBtn.addEventListener('touchstart', pressBrake, { passive: false });
+    simBrakeBtn.addEventListener('touchend', releaseBrake, { passive: false });
+    simBrakeBtn.addEventListener('touchcancel', releaseBrake);
+  }
 
   // Paddle shifters
-  paddleUpBtn.addEventListener('click', () => drivetrain.manualShiftUp());
-  paddleDownBtn.addEventListener('click', () => drivetrain.manualShiftDown());
-  hudPaddleUp.addEventListener('click', () => drivetrain.manualShiftUp());
-  hudPaddleDown.addEventListener('click', () => drivetrain.manualShiftDown());
+  if (paddleUpBtn) paddleUpBtn.addEventListener('click', () => drivetrain.manualShiftUp());
+  if (paddleDownBtn) paddleDownBtn.addEventListener('click', () => drivetrain.manualShiftDown());
+  if (hudPaddleUp) hudPaddleUp.addEventListener('click', () => drivetrain.manualShiftUp());
+  if (hudPaddleDown) hudPaddleDown.addEventListener('click', () => drivetrain.manualShiftDown());
 
-  toggleManualModeBtn.addEventListener('click', () => {
-    drivetrain.toggleManualMode();
-    updateShiftModeLabel();
-    toggleManualModeBtn.textContent = drivetrain.isManualMode ? 'Switch to Auto' : 'Switch to Manual';
-  });
+  if (toggleManualModeBtn) {
+    toggleManualModeBtn.addEventListener('click', () => {
+      drivetrain.toggleManualMode();
+      updateShiftModeLabel();
+      toggleManualModeBtn.textContent = drivetrain.isManualMode ? 'Switch to Auto' : 'Switch to Manual';
+    });
+  }
 
   // MPH / KMH toggle
-  speedUnitBtn.addEventListener('click', () => {
-    useMph = !useMph;
-    speedUnitBtn.textContent = useMph ? 'MPH' : 'KM/H';
-    hudModalUnit.textContent = useMph ? 'MPH' : 'KM/H';
-  });
+  if (speedUnitBtn) {
+    speedUnitBtn.addEventListener('click', () => {
+      useMph = !useMph;
+      speedUnitBtn.textContent = useMph ? 'MPH' : 'KM/H';
+      if (hudModalUnit) hudModalUnit.textContent = useMph ? 'MPH' : 'KM/H';
+    });
+  }
 
   /* -------------------------------------------------------------
      7. Automated Drive Scenarios
@@ -815,7 +952,8 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSteeringUI(steerIn);
       } else {
         if (keys.gas) throttleIn = 1.0;
-        else throttleIn = parseInt(simPedalSlider.value) / 100;
+        else if (simPedalSlider) throttleIn = parseInt(simPedalSlider.value) / 100;
+        else throttleIn = 0.0;
         if (keys.brake) brakeIn = 1.0;
 
         if (keys.steerLeft) steerIn = -0.75;
@@ -1661,7 +1799,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Drive Mode / G-Force tag in lower half
     ctx.font = '700 7.5px "Rajdhani", sans-serif';
     ctx.fillStyle = '#f2a900';
-    ctx.fillText(drivetrain.driveMode.toUpperCase(), cx, cy + 26);
+    ctx.fillText((drivetrain.driveMode || 'sport').toUpperCase(), cx, cy + 26);
 
     ctx.font = '700 7.5px "Share Tech Mono", monospace';
     const latG = drivetrain.gForceLateral || 0;
