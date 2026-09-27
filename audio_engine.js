@@ -246,6 +246,9 @@ class RevverAudioEngine {
 
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     this.ctx = new AudioContextClass({ latencyHint: 'interactive' });
+    if (this.ctx.state === 'suspended') {
+      await this.ctx.resume();
+    }
 
     // Master Analyser and Gain
     this.analyser = this.ctx.createAnalyser();
@@ -322,20 +325,26 @@ class RevverAudioEngine {
           const msg = e.data;
           if (msg.type === 'WASM_READY') {
             console.log('✓ Ange Yaghi C++ Engine-Sim WASM Core successfully initialized in AudioWorklet.');
-          } else if (msg.type === 'RPM_UPDATE') {
-            if (this.engineState === 'CRANKING' || this.engineState === 'STARTING' || this.engineState === 'STOPPING') {
-              this.currentRpm = msg.rpm;
-            }
+          } else if (msg.type === 'ENGINE_CRANKING') {
+            this.engineState = 'CRANKING';
+            this.currentRpm = msg.rpm || 280;
+            if (this.onStateChangeCallback) this.onStateChangeCallback('CRANKING', this.currentRpm);
           } else if (msg.type === 'ENGINE_CATCH') {
             this.engineState = 'STARTING';
-            if (this.onStateChangeCallback) this.onStateChangeCallback('STARTING', msg.rpm);
+            this.currentRpm = msg.rpm || 2150;
+            if (this.onStateChangeCallback) this.onStateChangeCallback('STARTING', this.currentRpm);
           } else if (msg.type === 'ENGINE_RUNNING') {
             this.engineState = 'RUNNING';
-            if (this.onStateChangeCallback) this.onStateChangeCallback('RUNNING', msg.rpm);
+            this.currentRpm = msg.rpm || 850;
+            if (this.onStateChangeCallback) this.onStateChangeCallback('RUNNING', this.currentRpm);
           } else if (msg.type === 'ENGINE_OFF') {
             this.engineState = 'OFF';
             this.currentRpm = 0;
             if (this.onStateChangeCallback) this.onStateChangeCallback('OFF', 0);
+          } else if (msg.type === 'RPM_UPDATE') {
+            if (this.engineState === 'CRANKING' || this.engineState === 'STARTING' || this.engineState === 'STOPPING') {
+              this.currentRpm = msg.rpm;
+            }
           }
         };
 
@@ -746,29 +755,18 @@ class RevverAudioEngine {
     const t0 = performance.now();
     const t = this.ctx.currentTime;
 
-    // Fade in engine bus
-    this.engineBus.gain.setTargetAtTime(0.78, t, 0.04);
-
-    // Always play high-fidelity mechanical starter motor cranking sound (compression struggles & DC motor hum)
-    this.playOneShot(this.starterBuffer, 0.90);
-
-    let catchTriggered = false;
-    const triggerCatchSound = () => {
-      if (catchTriggered) return;
-      catchTriggered = true;
-      this.playOneShot(this.catchBuffer, 1.0);
-    };
+    // Fade in engine bus to full presence
+    this.engineBus.gain.setTargetAtTime(1.0, t, 0.04);
 
     if (this.isWorkletActive && this.engineSimNode) {
-      // Engage physical starter in worklet
+      // Engage authentic physical starter motor in C++ simulation
       this.engineSimNode.port.postMessage({ type: 'START_ENGINE' });
 
       // Track starter cadence and catch state
       const crankPoll = setInterval(() => {
         if (this.engineState === 'CRANKING') {
-          if (callbacks.onProgress) callbacks.onProgress({ state: 'CRANKING', rpm: this.currentRpm || 195 });
+          if (callbacks.onProgress) callbacks.onProgress({ state: 'CRANKING', rpm: this.currentRpm || 280 });
         } else if (this.engineState === 'STARTING') {
-          triggerCatchSound();
           if (callbacks.onProgress) callbacks.onProgress({ state: 'STARTING', rpm: this.currentRpm || 2150 });
         } else if (this.engineState === 'RUNNING') {
           clearInterval(crankPoll);
@@ -778,31 +776,30 @@ class RevverAudioEngine {
 
       // Failsafe timeout: ensure ignition catch transition happens even if worklet message is delayed
       setTimeout(() => {
-        if (this.engineState === 'CRANKING') {
-          triggerCatchSound();
+        if (this.engineState !== 'RUNNING' && this.engineState !== 'OFF') {
+          this.engineState = 'RUNNING';
           this.engineSimNode.port.postMessage({
             type: 'SET_STATE',
-            ignition: true,
-            engineState: 'STARTING',
-            targetRpm: 2150
+            engineState: 'RUNNING',
+            targetRpm: p.idleRpm
           });
-          setTimeout(() => {
-            if (this.engineState !== 'OFF') {
-              this.engineState = 'RUNNING';
-              this.engineSimNode.port.postMessage({
-                type: 'SET_STATE',
-                engineState: 'RUNNING',
-                targetRpm: p.idleRpm
-              });
-              clearInterval(crankPoll);
-              if (callbacks.onComplete) callbacks.onComplete();
-            }
-          }, 850);
+          clearInterval(crankPoll);
+          if (callbacks.onComplete) callbacks.onComplete();
         }
-      }, 950);
+      }, 1600);
 
       return;
     }
+
+    // Fallback if worklet not supported
+    this.playOneShot(this.starterBuffer, 0.90);
+
+    let catchTriggered = false;
+    const triggerCatchSound = () => {
+      if (catchTriggered) return;
+      catchTriggered = true;
+      this.playOneShot(this.catchBuffer, 1.0);
+    };
 
     // Fallback if worklet not supported
     const crankInterval = setInterval(() => {
@@ -862,11 +859,8 @@ class RevverAudioEngine {
     const p = this.activeProfile;
     const startRpm = this.currentRpm || p.idleRpm;
 
-    // Always play physical shutdown spin-down sound (closed throttle compression thuds & vacuum sigh)
-    this.playOneShot(this.shutdownBuffer, 0.95);
-
     if (this.isWorkletActive && this.engineSimNode) {
-      // Signal physical shutdown to engine-sim worklet
+      // Signal authentic physical shutdown to C++ engine-sim worklet
       this.engineSimNode.port.postMessage({ type: 'STOP_ENGINE' });
 
       // Poll spindown progress until worklet reports ENGINE_OFF
@@ -895,7 +889,7 @@ class RevverAudioEngine {
       return;
     }
 
-    // Fallback shutdown with layered buffer
+    // Fallback shutdown with layered buffer only if worklet is not active
     this.playOneShot(this.shutdownBuffer, 0.90);
     const t = this.ctx.currentTime;
     if (this.accelGain) this.accelGain.gain.setValueAtTime(0, t);
@@ -960,6 +954,7 @@ class RevverAudioEngine {
     if (this.isWorkletActive && this.engineSimNode) {
       this.engineSimNode.port.postMessage({
         type: 'SET_STATE',
+        engineState: this.engineState,
         targetRpm: this.currentRpm,
         throttle: isShiftCut ? (this.currentThrottle * 0.25) : this.currentThrottle,
         shiftCut: isShiftCut,

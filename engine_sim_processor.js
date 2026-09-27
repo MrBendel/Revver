@@ -48,8 +48,23 @@ class EngineSimProcessor extends AudioWorkletProcessor {
       } else if (data.type === 'STOP_ENGINE') {
         this.stopEngine();
       } else if (data.type === 'SET_STATE') {
+        if (data.engineState !== undefined) {
+          if (data.engineState === 'RUNNING') {
+            this.engineState = 'RUNNING';
+            this.set_starter(0);
+            this.set_ignition(1);
+          } else if (data.engineState === 'STOPPING' && this.engineState !== 'STOPPING') {
+            this.stopEngine();
+          } else if (data.engineState === 'OFF') {
+            this.engineState = 'OFF';
+            this.set_starter(0);
+            this.set_ignition(0);
+            this.set_throttle(0.0);
+            if (this.set_target_rpm) this.set_target_rpm(0, 0.0);
+          }
+        }
         if (data.targetRpm !== undefined && this.set_target_rpm) {
-          const strength = (this.engineState === 'RUNNING') ? 0.22 : (this.engineState === 'STARTING' ? 0.30 : 0.0);
+          const strength = (this.engineState === 'RUNNING') ? 0.35 : (this.engineState === 'STARTING' ? 0.45 : 0.0);
           this.set_target_rpm(data.targetRpm, strength);
         }
         if (data.throttle !== undefined) {
@@ -60,9 +75,6 @@ class EngineSimProcessor extends AudioWorkletProcessor {
         }
         if (data.clutch !== undefined && this.set_clutch) {
           this.set_clutch(data.clutch);
-        }
-        if (data.engineState === 'STOPPING' && this.engineState !== 'STOPPING') {
-          this.stopEngine();
         }
       }
     };
@@ -137,14 +149,15 @@ class EngineSimProcessor extends AudioWorkletProcessor {
 
     this.set_ignition(1);
     this.set_starter(1);
-    this.set_throttle(0.25);
-    if (this.set_target_rpm) this.set_target_rpm(280, 0.18);
-    this.port.postMessage({ type: 'ENGINE_CATCH' });
+    this.set_throttle(0.30);
+    if (this.set_target_rpm) this.set_target_rpm(280, 0.25);
+    this.port.postMessage({ type: 'ENGINE_CRANKING', rpm: 280 });
   }
 
   stopEngine() {
     if (!this.isReady) return;
     this.engineState = 'STOPPING';
+    this.stopStartTime = currentTime;
     this.set_starter(0);
     this.set_ignition(0);
     this.set_throttle(0.0);
@@ -158,7 +171,9 @@ class EngineSimProcessor extends AudioWorkletProcessor {
         const activeThrottle = 0.05 + this.currentThrottle * 0.95;
         this.set_throttle(activeThrottle);
       } else if (this.engineState === 'CRANKING') {
-        this.set_throttle(0.25);
+        this.set_throttle(0.30);
+      } else if (this.engineState === 'STARTING') {
+        this.set_throttle(0.40);
       } else {
         this.set_throttle(0.0);
       }
@@ -180,15 +195,25 @@ class EngineSimProcessor extends AudioWorkletProcessor {
 
     // Physical Starter Catch Logic
     if (this.engineState === 'CRANKING') {
-      const rpm = this.get_rpm();
-      if (rpm > 350 && (currentTime - this.crankStartTime) > 0.35) {
+      const elapsed = currentTime - this.crankStartTime;
+      if (elapsed > 0.40) {
         this.set_starter(0);
+        this.engineState = 'STARTING';
+        this.setThrottle(0.40);
+        if (this.set_target_rpm) this.set_target_rpm(2150, 0.35);
+        this.port.postMessage({ type: 'ENGINE_CATCH', rpm: 2150 });
+      }
+    } else if (this.engineState === 'STARTING') {
+      const elapsed = currentTime - this.crankStartTime;
+      if (elapsed > 1.15) {
         this.engineState = 'RUNNING';
-        this.port.postMessage({ type: 'ENGINE_RUNNING', rpm: Math.round(rpm) });
+        this.setThrottle(0.0);
+        if (this.set_target_rpm) this.set_target_rpm(850, 0.25);
+        this.port.postMessage({ type: 'ENGINE_RUNNING', rpm: 850 });
       }
     } else if (this.engineState === 'STOPPING') {
-      const rpm = this.get_rpm();
-      if (rpm < 40) {
+      const elapsed = currentTime - this.stopStartTime;
+      if (elapsed > 0.85) {
         this.engineState = 'OFF';
         this.currentRpm = 0;
         this.port.postMessage({ type: 'ENGINE_OFF' });

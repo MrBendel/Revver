@@ -148,6 +148,7 @@ link_cmd = [
     "-s", "INITIAL_MEMORY=67108864", # 64MB initial memory
     "-s", f"EXPORTED_FUNCTIONS={funcs_arg}",
     "-s", f"EXPORTED_RUNTIME_METHODS={runtime_arg}",
+    "-s", "INCOMING_MODULE_JS_API=['wasmBinary','instantiateWasm','locateFile','print','printErr']",
     "-s", "MODULARIZE=1",
     "-s", "EXPORT_ES6=1",
     "-s", "EXPORT_NAME=createEngineSim",
