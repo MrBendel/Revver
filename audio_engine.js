@@ -289,12 +289,26 @@ class RevverAudioEngine {
     this.isRunning = true;
   }
 
+  getProfileId(profile) {
+    if (!profile) return 0;
+    const id = (typeof profile === 'string') ? profile : (profile.id || '');
+    if (id.includes('turbo') || id.includes('turboV6') || id.includes('turboFlat6')) return 1;
+    if (id.includes('v8')) return 2;
+    if (id.includes('v10')) return 3;
+    return 0; // default flat6 GT3
+  }
+
   /**
    * Loads and attaches the Ange Yaghi engine-sim AudioWorklet Processor
    */
   async setupEngineSimWorklet() {
     try {
       if (this.ctx.audioWorklet) {
+        console.log('Fetching engine_sim.wasm for AudioWorklet...');
+        const wasmResp = await fetch('engine_sim.wasm');
+        if (!wasmResp.ok) throw new Error(`HTTP error fetching engine_sim.wasm: ${wasmResp.status}`);
+        const wasmBinary = await wasmResp.arrayBuffer();
+
         await this.ctx.audioWorklet.addModule('engine_sim_processor.js');
 
         this.engineSimNode = new AudioWorkletNode(this.ctx, 'engine-sim-processor', {
@@ -306,7 +320,9 @@ class RevverAudioEngine {
         // Handle physical events from the simulation thread
         this.engineSimNode.port.onmessage = (e) => {
           const msg = e.data;
-          if (msg.type === 'RPM_UPDATE') {
+          if (msg.type === 'WASM_READY') {
+            console.log('✓ Ange Yaghi C++ Engine-Sim WASM Core successfully initialized in AudioWorklet.');
+          } else if (msg.type === 'RPM_UPDATE') {
             if (this.engineState === 'CRANKING' || this.engineState === 'STARTING' || this.engineState === 'STOPPING') {
               this.currentRpm = msg.rpm;
             }
@@ -326,14 +342,17 @@ class RevverAudioEngine {
         // Connect engine-sim output into master engine bus
         this.engineSimNode.connect(this.engineBus);
 
-        // Send active profile
+        // Send active profile and binary
+        const profileId = this.getProfileId(this.activeProfile);
         this.engineSimNode.port.postMessage({
-          type: 'SET_PROFILE',
-          profile: this.activeProfile
-        });
+          type: 'INIT_WASM',
+          wasmBinary,
+          profileId,
+          sampleRate: this.ctx.sampleRate
+        }, [wasmBinary]);
 
         this.isWorkletActive = true;
-        console.log('✓ Ange Yaghi Engine-Sim Procedural Combustion Core Activated.');
+        console.log('✓ Ange Yaghi Engine-Sim C++ Simulation Core Dispatched.');
         return;
       }
     } catch (err) {
@@ -656,6 +675,7 @@ class RevverAudioEngine {
     if (this.isWorkletActive && this.engineSimNode) {
       this.engineSimNode.port.postMessage({
         type: 'SET_PROFILE',
+        profileId: this.getProfileId(profile),
         profile: profile
       });
     }

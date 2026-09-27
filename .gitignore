@@ -21,3 +21,5 @@ android/build/
 android/app/build/
 android/app/src/main/assets/
 secrets/
+build_wasm/
+test_compile_core.py

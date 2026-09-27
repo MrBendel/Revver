@@ -965,6 +965,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Step Drivetrain Simulation
     if (isEngineRunning && audio.engineState === 'RUNNING') {
       drivetrain.update(dt, throttleIn, brakeIn, gpsSpeedIn, steerIn, externalLateralG);
+      audio.update(drivetrain.currentRpm, drivetrain.throttle, drivetrain.shiftCutActive);
       audio.updateTireAcoustics(drivetrain.speedMps, drivetrain.gForceLateral, drivetrain.gForceLongitudinal, drivetrain.throttle, drivetrain.brake);
     } else if (audio.engineState === 'CRANKING' || audio.engineState === 'STARTING' || audio.engineState === 'STOPPING') {
       // RPM during starter cranking or shutdown is driven by the engine sequence
